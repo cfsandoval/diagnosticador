@@ -58,6 +58,10 @@
                             <i class="fa-solid fa-book"></i>
                             <span>Metodología Analítica</span>
                         </li>
+                        <li class="structures-list-item" id="sidebar-tendencias-btn" onclick="selectTendenciasSection()">
+                            <i class="fa-solid fa-arrow-trend-up"></i>
+                            <span>Tendencias CEPAL 2025</span>
+                        </li>
                     </ul>
                 </div>
 
@@ -631,6 +635,35 @@
                             </div>
                         </div>
                     </section>
+                </div>
+            </div>
+
+            <!-- SECTION 5: TENDENCIAS CEPAL 2025 -->
+            <div id="tendencias-section" style="display: none; height: 100%;">
+                <header class="dashboard-header">
+                    <div class="dashboard-title-area">
+                        <span class="indicator-subtitle">Análisis de Informes de la CEPAL (2024-2025)</span>
+                        <h1 class="indicator-title">Tendencias de Desarrollo en América Latina y Colombia</h1>
+                    </div>
+                    <div class="api-badge" style="background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.2);">
+                        <span class="dot" style="background-color: var(--accent-green); box-shadow: 0 0 8px var(--accent-green);"></span>
+                        <span style="color: var(--accent-green); font-weight: 600;">Módulo Tendencias</span>
+                    </div>
+                </header>
+
+                <div class="dashboard-body" style="padding-bottom: 2rem;">
+                    <!-- Report selector tabs -->
+                    <div class="card" style="margin-bottom: 1.5rem; padding: 1.25rem;">
+                        <label class="filter-label" style="display: block; margin-bottom: 0.75rem; font-weight: 600;">Seleccionar Informe de la CEPAL:</label>
+                        <div class="btn-group" id="tendencias-report-tabs" style="display: flex; flex-wrap: wrap; width: 100%; background: rgba(15, 23, 42, 0.5); border: 1px solid var(--border-color); border-radius: 10px; padding: 4px; gap: 4px;">
+                            <!-- Tabs populated by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Active Report Content Card -->
+                    <div id="tendencias-content-area" style="display: flex; flex-direction: column; gap: 1.5rem;">
+                        <!-- Dynamic content populated by JS -->
+                    </div>
                 </div>
             </div>
             </div>

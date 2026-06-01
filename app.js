@@ -20,7 +20,8 @@ let appState = {
     pyramidChartCol: null,
     pyramidChartAlc: null,
     pyramidDataCache: {}, // Cache for all structural indicators to enable fast print report generation
-    selectedReportType: 'executive'
+    selectedReportType: 'executive',
+    activeTendenciaReport: 'balance_preliminar'
 };
 
 // Constants for Standard Dimensions
@@ -1253,6 +1254,11 @@ function switchGlobalSection(sectionId) {
         metodologiaSection.style.display = sectionId === 'metodologia' ? 'block' : 'none';
     }
     
+    const tendenciasSection = document.getElementById('tendencias-section');
+    if (tendenciasSection) {
+        tendenciasSection.style.display = sectionId === 'tendencias' ? 'block' : 'none';
+    }
+    
     // Update sidebar brechas button active highlight
     const sidebarBrechasBtn = document.getElementById('sidebar-brechas-btn');
     if (sidebarBrechasBtn) {
@@ -1263,6 +1269,12 @@ function switchGlobalSection(sectionId) {
     const sidebarMetodologiaBtn = document.getElementById('sidebar-metodologia-btn');
     if (sidebarMetodologiaBtn) {
         sidebarMetodologiaBtn.classList.toggle('active', sectionId === 'metodologia');
+    }
+    
+    // Update sidebar tendencias button active highlight
+    const sidebarTendenciasBtn = document.getElementById('sidebar-tendencias-btn');
+    if (sidebarTendenciasBtn) {
+        sidebarTendenciasBtn.classList.toggle('active', sectionId === 'tendencias');
     }
     
     // Auto load first indicator of structures if none is loaded yet
@@ -1293,10 +1305,25 @@ function selectMetodologiaSection() {
     // Clear selections in the thematic tree and structures
     document.querySelectorAll('.tree-leaf').forEach(el => el.classList.remove('selected'));
     document.querySelectorAll('.structures-list-item').forEach(el => {
-        if (el.id !== 'sidebar-metodologia-btn' && el.id !== 'sidebar-brechas-btn') {
+        if (el.id !== 'sidebar-metodologia-btn' && el.id !== 'sidebar-brechas-btn' && el.id !== 'sidebar-tendencias-btn') {
             el.classList.remove('active');
         }
     });
+}
+
+// 11d. Click handler for sidebar Tendencias section
+function selectTendenciasSection() {
+    switchGlobalSection('tendencias');
+    
+    // Clear selections in the thematic tree and structures
+    document.querySelectorAll('.tree-leaf').forEach(el => el.classList.remove('selected'));
+    document.querySelectorAll('.structures-list-item').forEach(el => {
+        if (el.id !== 'sidebar-tendencias-btn' && el.id !== 'sidebar-brechas-btn' && el.id !== 'sidebar-metodologia-btn') {
+            el.classList.remove('active');
+        }
+    });
+    
+    renderTendencias();
 }
 
 // 12. Initialize Sidebar for Structures
@@ -3905,4 +3932,298 @@ function formatXlsValue(val) {
         minimumFractionDigits: 0,
         maximumFractionDigits: decimals
     });
+}
+
+// ==========================================
+// 19. TENDENCIAS CEPAL 2025 MODULE
+// ==========================================
+
+const CEPAL_REPORTS_DATA = [
+    {
+        id: "balance_preliminar",
+        title: "Balance Preliminar de las Economías de América Latina y el Caribe 2025",
+        shortTitle: "Balance Económico 2025",
+        icon: "fa-scale-balanced",
+        trends: [
+            {
+                title: "Consolidación de una trampa de bajo crecimiento económico",
+                desc: "La región se mantiene en una trayectoria de escaso dinamismo, con un crecimiento proyectado del 2,4% en 2025 y del 2,3% en 2026. Esto completaría una secuencia de cuatro años consecutivos con tasas cercanas al 2,3%, reafirmando una baja capacidad estructural para crecer.",
+                analysis: "En Colombia, la desaceleración del crecimiento ha seguido un patrón similar al promedio regional, enfrentando dificultades para superar tasas del 2% anual en el periodo de post-pandemia, evidenciando limitaciones estructurales de productividad.",
+                indicators: [
+                    { id: 2206, name: "PIB total anual por habitante a precios constantes en dólares", note: "Mide el nivel de ingreso real y el crecimiento económico general de largo plazo." }
+                ]
+            },
+            {
+                title: "Desaceleración continua de la inflación",
+                desc: "La inflación regional mantiene una trayectoria descendente, reduciéndose a la mitad entre febrero y septiembre de 2025 para alcanzar una mediana del 1,8%. Esta reducción ha permitido a la mayor parte de los bancos centrales continuar con un ciclo de recortes en las tasas de política monetaria.",
+                analysis: "Colombia ha mostrado una convergencia inflacionaria más lenta debido a factores de indexación y choques climáticos, pero sigue la tendencia regional descendente que permite la flexibilización gradual de las tasas del Banco de la República.",
+                indicators: [
+                    { id: 2206, name: "PIB total anual por habitante (como proxy de estabilidad macroeconómica)", note: "Nota: Para ver el índice inflacionario de precios directamente, puedes buscar en el explorador indicadores afines al IPC." }
+                ]
+            },
+            {
+                title: "Pérdida de dinamismo del consumo privado y estancamiento de la inversión",
+                desc: "El consumo privado se desacelera debido a un menor crecimiento del empleo y de los salarios, aunque sigue siendo el principal motor de la economía. Simultáneamente, la formación bruta de capital fijo (inversión) se mantiene en niveles bajos y no logra repuntar lo suficiente para cambiar el patrón de bajo crecimiento.",
+                analysis: "El consumo en Colombia se ha visto afectado por la contracción del crédito de consumo y altas tasas reales. La inversión (formación bruta de capital) muestra un estancamiento severo, especialmente en obras civiles y vivienda.",
+                indicators: [
+                    { id: 127, name: "Tasa de desocupación por sexo", note: "El desempleo y la calidad del trabajo impactan directamente el ingreso de los hogares y el consumo privado." }
+                ]
+            }
+        ]
+    },
+    {
+        id: "estudio_economico",
+        title: "Estudio Económico de América Latina y el Caribe 2025",
+        shortTitle: "Estudio Económico 2025",
+        icon: "fa-chart-line",
+        trends: [
+            {
+                title: "Restricción del espacio fiscal y alta carga de deuda",
+                desc: "Los niveles de deuda pública continúan siendo elevados (50,2% del PIB en el primer trimestre de 2025 en América Latina), lo que, sumado al incremento en los pagos de intereses, limita severamente el margen de los Gobiernos para expandir la inversión pública.",
+                analysis: "Colombia enfrenta una estrecha restricción fiscal regida por la Regla Fiscal y un incremento en el servicio de la deuda, lo que ha reducido la inversión pública directa, obligando a buscar alianzas público-privadas.",
+                indicators: [
+                    { id: 2206, name: "PIB total anual por habitante (Sostenibilidad de deuda)", note: "El nivel de PIB por habitante es el denominador clave para medir la capacidad de pago y solvencia soberana." }
+                ]
+            },
+            {
+                title: "Persistencia de la vulnerabilidad en las cuentas externas",
+                desc: "Se proyecta un déficit de la cuenta corriente del 1,1% del PIB para 2025. La región sigue dependiendo fuertemente de la entrada de remesas y de los flujos de inversión extranjera para compensar los crecientes egresos netos por renta factorial.",
+                analysis: "El déficit de cuenta corriente de Colombia se ha moderado, pero permanece por encima de la media regional (cercano al 2.5% del PIB), lo que la hace altamente vulnerable a choques externos y dependiente de flujos financieros.",
+                indicators: [
+                    { id: 2206, name: "PIB total anual (Tamaño de la economía frente al sector externo)", note: "Ayuda a dimensionar la escala del flujo comercial y financiero internacional respecto a la producción nacional." }
+                ]
+            },
+            {
+                title: "Ampliación de la brecha de financiamiento para la transformación productiva",
+                desc: "Existe un déficit creciente de recursos financieros necesarios para alcanzar los Objetivos de Desarrollo Sostenible (ODS) y abordar la transición climática. Esto hace urgente una reforma a la arquitectura financiera internacional y un rol más activo de la banca de desarrollo.",
+                analysis: "Colombia promueve agendas de 'financiamiento verde' e intercambios de deuda por acción climática, pero el déficit de recursos para infraestructura resiliente al clima sigue ampliándose significativamente.",
+                indicators: [
+                    { id: 5649, name: "Emisiones de dióxido de carbono (CO₂) por habitante", note: "Refleja el desafío de descarbonización y financiamiento asociado a la transición climática." }
+                ]
+            }
+        ]
+    },
+    {
+        id: "ied_2025",
+        title: "La Inversión Extranjera Directa en América Latina y el Caribe 2025",
+        shortTitle: "Inversión Extranjera (IED)",
+        icon: "fa-money-bill-transfer",
+        trends: [
+            {
+                title: "Crecimiento de la IED impulsado por la reinversión frente al estancamiento de nuevos capitales",
+                desc: "Las entradas de IED crecieron un 7,1% en 2024, alcanzando los 188.962 millones de dólares. Este aumento se debió principalmente a la reinversión de utilidades de empresas transnacionales ya instaladas, mientras que los aportes de capital fresco (nuevas inversiones) cayeron por segundo año consecutivo.",
+                analysis: "En Colombia, la dinámica de IED se ha concentrado fuertemente en hidrocarburos y minería (IED tradicional) y reinversión en servicios financieros, mostrando una caída en nuevos capitales para la industria manufacturera.",
+                indicators: [
+                    { id: 2206, name: "PIB total anual por habitante (Atracción de capitales)", note: "Un mayor nivel de desarrollo e ingreso por habitante correlaciona con la atracción de inversiones complejas." }
+                ]
+            },
+            {
+                title: "Reconfiguración de las inversiones hacia la transición energética",
+                desc: "Se registra un interés sostenido en el sector de energías renovables y un aumento exponencial en los anuncios de proyectos ligados a minerales críticos (como el cobre y el litio), áreas donde la región posee una posición geopolítica y productiva estratégica.",
+                analysis: "Colombia tiene un potencial inmenso en cobre y energía eólica/solar en la Guajira, sin embargo, el desarrollo de proyectos enfrenta retrasos por consultas previas y licencias ambientales en comparación con la agilidad regional.",
+                indicators: [
+                    { id: 5649, name: "Emisiones de dióxido de carbono (CO₂) por habitante", note: "La descarbonización de la matriz energética mediante la transición reduce las emisiones directas." }
+                ]
+            },
+            {
+                title: "Auge de la inversión orientada a la transformación digital",
+                desc: "Los proyectos de Inversión Extranjera Directa en el sector de las comunicaciones experimentaron un crecimiento del 71% en 2024 respecto al año anterior. Esto fue liderado por inversiones masivas para el desarrollo de centros de procesamiento de datos e infraestructura digital.",
+                analysis: "Colombia ha ganado tracción como hub de Data Centers en la región andina gracias a la fibra óptica submarina y estímulos gubernamentales, lo cual requiere capital humano avanzado para su asimilación.",
+                indicators: [
+                    { id: 2206, name: "PIB total anual por habitante (Infraestructura y digitalización)", note: "Relacionado con la productividad agregada aportada por los sectores de tecnologías de la información." }
+                ]
+            }
+        ]
+    },
+    {
+        id: "desarrollo_productivo",
+        title: "Panorama de las Políticas de Desarrollo Productivo en América Latina y el Caribe 2025",
+        shortTitle: "Desarrollo Productivo",
+        icon: "fa-industry",
+        trends: [
+            {
+                title: "Retroceso histórico de la productividad laboral",
+                desc: "Tras un incremento entre 1990 y 2013, la productividad laboral de la región ha experimentado una década de caídas. Desde 2017, la productividad de América Latina y el Caribe se situó por debajo del promedio mundial y la brecha no ha dejado de ampliarse.",
+                analysis: "Colombia muestra un estancamiento persistente de la productividad laboral, ligado a una alta informalidad laboral (cercana al 55%) que impide la acumulación de capital humano e incorporación tecnológica.",
+                indicators: [
+                    { id: 120, name: "Tasa de participación en la fuerza de trabajo", note: "Refleja el uso del factor trabajo. Una baja productividad laboral limita la generación de empleo de calidad." }
+                ]
+            },
+            {
+                title: "Profundización de las brechas de productividad por tamaño de empresa",
+                desc: "La región no solo presenta una productividad general inferior a la de economías avanzadas, sino que el rezago es drásticamente mayor en las micro, pequeñas y medianas empresas. En la última década, la distancia en productividad entre las grandes empresas y las de menor tamaño ha aumentado, perjudicando la integración del sistema productivo.",
+                analysis: "En Colombia, las micro y pequeñas empresas concentran más del 80% del empleo, pero su productividad promedio es menos del 20% de la de las grandes empresas, lo que perpetúa la trampa de desigualdad laboral.",
+                indicators: [
+                    { id: 127, name: "Tasa de desocupación por sexo", note: "La incapacidad de las MiPyMEs para escalar productivamente restringe la demanda estructural de empleo formal." }
+                ]
+            },
+            {
+                title: "Resurgimiento y formalización de políticas de desarrollo productivo",
+                desc: "Diversos países de la región han vuelto a situar la política industrial en el centro de sus estrategias gubernamentales. Se observa un retorno al diseño de planes estructurados de alcance nacional y un fuerte impulso a la creación de iniciativas clúster para fomentar la articulación entre el sector público, privado y académico.",
+                analysis: "Colombia ha estructurado la 'Política de Reindustrialización' enfocada en la transición energética, la soberanía alimentaria, la salud y la defensa, fomentando clústeres regionales en departamentos clave.",
+                indicators: [
+                    { id: 2206, name: "PIB total anual por habitante (Impacto de políticas industriales)", note: "El éxito de las políticas de desarrollo productivo se refleja en el crecimiento sostenido del PIB real per cápita." }
+                ]
+            }
+        ]
+    },
+    {
+        id: "panorama_social",
+        title: "Panorama Social de América Latina y el Caribe 2025",
+        shortTitle: "Panorama Social",
+        icon: "fa-people-roof",
+        trends: [
+            {
+                title: "Caída histórica de la pobreza monetaria y multidimensional",
+                desc: "La pobreza monetaria se redujo al 25,5% en 2024, alcanzando su nivel más bajo desde que existen registros comparables, impulsada fundamentalmente por mejoras en los ingresos laborales. De manera paralela, la pobreza multidimensional cayó al 20,9%, reflejando mejoras en acceso a servicios básicos y conectividad.",
+                analysis: "Colombia ha logrado reducciones notables en pobreza monetaria (bajando al 33% en 2023) y pobreza multidimensional (al 12.1%), apalancada por subsidios del gobierno y recuperación del empleo urbano, aunque persisten altos niveles de desigualdad rural.",
+                indicators: [
+                    { id: 3328, name: "Población en situación de pobreza extrema y pobreza", note: "Indicador directo que refleja el porcentaje de la población por debajo de los umbrales de ingreso." }
+                ]
+            },
+            {
+                title: "Desigualdad de ingresos estructuralmente elevada y rígida",
+                desc: "A pesar de una leve tendencia a la baja en la última década, el índice de Gini se mantiene en niveles extremos comparado con otras regiones del mundo. La concentración de la riqueza limita severamente la movilidad social, impidiendo que la educación funcione como un igualador de oportunidades.",
+                analysis: "Colombia ostenta uno de los índices de Gini más altos del mundo (alrededor de 0.54), indicando una rigidez social y una concentración del ingreso que limita los efectos positivos del crecimiento económico en el bienestar general.",
+                indicators: [
+                    { id: 3341, name: "Pobreza y pobreza extrema por sexo y edad", note: "La desigualdad intersecta fuertemente con la edad y el género, afectando en mayor proporción a niños y mujeres." }
+                ]
+            },
+            {
+                title: "Mantenimiento de profundas brechas de inclusión laboral y de cuidados",
+                desc: "El mercado de trabajo regional sigue fuertemente segmentado por género. Las mujeres enfrentan menores tasas de participación y mayor desocupación debido a la injusta organización social de los cuidados, una situación que se agrava al interseccionar con la exclusión que sufren la población indígena, afrodescendiente y las personas con discapacidad.",
+                analysis: "En Colombia, la brecha de participación laboral femenina supera los 20 puntos porcentuales. El Sistema Nacional de Cuidado busca mitigar este sesgo, redistribuyendo las labores domésticas no remuneradas para integrar a más mujeres al mercado formal.",
+                indicators: [
+                    { id: 120, name: "Tasa de participación en la fuerza de trabajo", note: "Visualiza la gran disparidad en las tasas de actividad económica entre hombres y mujeres." },
+                    { id: 127, name: "Tasa de desocupación por sexo", note: "Mide el exceso de desempleo femenino frente al masculino." }
+                ]
+            }
+        ]
+    },
+    {
+        id: "comercio_internacional",
+        title: "Perspectivas del Comercio Internacional de América Latina y el Caribe 2025",
+        shortTitle: "Comercio Internacional",
+        icon: "fa-ship",
+        trends: [
+            {
+                title: "Crecimiento comercial bajo amenaza por el proteccionismo global",
+                desc: "Si bien las exportaciones regionales de bienes crecieron un 4% en valor durante el primer semestre de 2025, el giro profundo en la política comercial de los Estados Unidos y la imposición de nuevos aranceles plantean un escenario de gran incertidumbre y deterioro para 2026.",
+                analysis: "Colombia posee un TLC con EE.UU., pero su canasta exportadora altamente dependiente del carbón y el petróleo (más del 50%) enfrenta retos de aranceles y la necesidad urgente de diversificación hacia manufacturas y agricultura.",
+                indicators: [
+                    { id: 2206, name: "PIB total anual por habitante (Exposición comercial)", note: "El nivel de PIB por habitante determina la resiliencia agregada frente a choques arancelarios en mercados clave." }
+                ]
+            },
+            {
+                title: "Dinamismo acelerado en la exportación de servicios modernos",
+                desc: "El comercio de servicios ha mostrado una expansión más rápida que el de bienes. Las exportaciones de servicios modernos (que incluyen telecomunicaciones, informática y servicios empresariales) lideran este crecimiento con un alza interanual del 13% en la primera mitad de 2025.",
+                analysis: "Las exportaciones de servicios de software, BPO y turismo de salud en Colombia han crecido a tasas de doble dígito, convirtiéndose en el renglón más prometedor para equilibrar la balanza de pagos nacional.",
+                indicators: [
+                    { id: 2206, name: "PIB total anual por habitante (Desarrollo del sector servicios)", note: "Los servicios modernos de alta complejidad aportan valor agregado directo al PIB per cápita." }
+                ]
+            },
+            {
+                title: "Baja participación y rezago en exportaciones de alta tecnología",
+                desc: "A pesar del crecimiento del comercio de bienes con alto contenido tecnológico a nivel mundial, la participación de América Latina y el Caribe en estas exportaciones se mantiene marginada por debajo del 5%. Esto refleja debilidades estructurales en la formación de capital humano avanzado y en las capacidades productivas de la región.",
+                analysis: "Colombia exporta menos de un 2% de bienes con alta tecnología en su canasta industrial. Se requiere escalar la inversión en I+D (que hoy es apenas del 0.3% del PIB) para cerrar la brecha con el este de Asia y economías desarrolladas.",
+                indicators: [
+                    { id: 120, name: "Tasa de participación en la fuerza de trabajo (Calificación técnica)", note: "La disponibilidad de capital humano activo calificado condiciona la inserción en cadenas de alta tecnología." }
+                ]
+            }
+        ]
+    }
+];
+
+function setActiveTendenciaReport(reportId) {
+    appState.activeTendenciaReport = reportId;
+    renderTendencias();
+}
+
+function selectIndicatorFromTrend(indicatorId, indicatorName) {
+    selectIndicator({
+        id: indicatorId,
+        name: `[${indicatorId}] ${indicatorName}`,
+        categoryPath: "CEPAL / Tendencias 2025"
+    });
+}
+
+function renderTendencias() {
+    const tabsContainer = document.getElementById('tendencias-report-tabs');
+    const contentArea = document.getElementById('tendencias-content-area');
+    
+    if (!tabsContainer || !contentArea) return;
+    
+    // 1. Render Report Selector Tabs
+    tabsContainer.innerHTML = CEPAL_REPORTS_DATA.map(report => {
+        const isActive = report.id === appState.activeTendenciaReport;
+        return `
+            <button class="btn-tab ${isActive ? 'active' : ''}" style="flex: 1; padding: 0.6rem; min-width: 140px; display: flex; align-items: center; justify-content: center; gap: 0.5rem; border: none; cursor: pointer; border-radius: 8px;" onclick="setActiveTendenciaReport('${report.id}')">
+                <i class="fa-solid ${report.icon}"></i>
+                <span>${report.shortTitle}</span>
+            </button>
+        `;
+    }).join('');
+    
+    // 2. Render Active Report Content
+    const activeReport = CEPAL_REPORTS_DATA.find(r => r.id === appState.activeTendenciaReport);
+    if (!activeReport) return;
+    
+    let html = `
+        <div class="card" style="padding: 1.5rem; background: linear-gradient(135deg, rgba(30, 41, 59, 0.4) 0%, rgba(17, 24, 39, 0.5) 100%); border-color: rgba(168, 85, 247, 0.15);">
+            <div style="display: flex; align-items: center; gap: 0.75rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; margin-bottom: 1.25rem;">
+                <i class="fa-solid ${activeReport.icon} diagnostic-icon" style="color: var(--color-alc); background: rgba(168, 85, 247, 0.1); font-size: 1.25rem; padding: 0.5rem; border-radius: 8px;"></i>
+                <h2 class="diagnostic-title" style="font-size: 1.25rem; font-weight: 700; font-family: var(--font-heading); color: var(--text-primary);">${activeReport.title}</h2>
+            </div>
+            <p style="font-size: 0.9375rem; color: var(--text-secondary); margin-bottom: 1rem; line-height: 1.6;">
+                A continuación se analizan las principales tendencias estructuradas por este informe oficial de la CEPAL para el periodo actual, vinculándolas con la realidad estadística de <strong>América Latina y el Caribe (ALC)</strong> y los indicadores de <strong>Colombia</strong>.
+            </p>
+        </div>
+    `;
+    
+    activeReport.trends.forEach((trend, idx) => {
+        html += `
+            <div class="card" style="padding: 1.5rem; transition: var(--transition-smooth);">
+                <div style="display: flex; gap: 0.75rem; align-items: flex-start; margin-bottom: 1rem;">
+                    <div style="background: var(--accent-blue); color: #0b0f19; font-weight: 700; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 0.85rem; margin-top: 0.15rem;">${idx + 1}</div>
+                    <div>
+                        <h3 style="font-family: var(--font-heading); font-size: 1.15rem; font-weight: 700; color: var(--text-primary); line-height: 1.3;">${trend.title}</h3>
+                    </div>
+                </div>
+                
+                <div style="display: flex; flex-direction: column; gap: 1.25rem; margin-left: 2rem;">
+                    <!-- Regional Context -->
+                    <div style="background: rgba(15, 23, 42, 0.3); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                        <span style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--color-alc); letter-spacing: 0.5px; display: block; margin-bottom: 0.35rem;">Contexto Regional (América Latina y el Caribe)</span>
+                        <p style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.5; margin: 0;">${trend.desc}</p>
+                    </div>
+                    
+                    <!-- Colombia Comparison -->
+                    <div style="background: rgba(255, 215, 0, 0.02); padding: 1rem; border-radius: 8px; border: 1px solid rgba(255, 215, 0, 0.08);">
+                        <span style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--color-colombia); letter-spacing: 0.5px; display: block; margin-bottom: 0.35rem;">Análisis Comparativo (Caso Colombia)</span>
+                        <p style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.5; margin: 0;">${trend.analysis}</p>
+                    </div>
+                    
+                    <!-- Linked Indicators -->
+                    <div>
+                        <span style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.5px; display: block; margin-bottom: 0.5rem;">Indicadores Relacionados en el Portal:</span>
+                        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                            ${trend.indicators.map(ind => `
+                                <div style="background: rgba(255, 255, 255, 0.01); border: 1px solid var(--border-color); padding: 0.85rem; border-radius: 8px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem;">
+                                    <div style="flex: 1; min-width: 250px;">
+                                        <strong style="font-size: 0.875rem; color: var(--text-primary); display: block; margin-bottom: 0.25rem;">[${ind.id}] ${ind.name}</strong>
+                                        <span style="font-size: 0.8rem; color: var(--text-muted);">${ind.note}</span>
+                                    </div>
+                                    <button class="btn-primary" style="padding: 0.4rem 0.85rem; font-size: 0.8rem; border-radius: 6px;" onclick="selectIndicatorFromTrend(${ind.id}, '${ind.name.replace(/'/g, "\\'")}')">
+                                        <i class="fa-solid fa-chart-line"></i> Explorar Datos en Vivo
+                                    </button>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    contentArea.innerHTML = html;
 }
