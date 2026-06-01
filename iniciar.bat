@@ -1,7 +1,7 @@
 @echo off
-title Diagnostico CEPALSTAT - Servidor Local
+title Diagnostico CEPAL - Servidor Local
 echo ==========================================================
-echo   Iniciando Servidor Local para Diagnostico CEPALSTAT
+echo   Iniciando Servidor Local para Diagnostico CEPAL
 echo ==========================================================
 echo.
 echo 1. Abriendo la aplicacion en tu navegador predeterminado...

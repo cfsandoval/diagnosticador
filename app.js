@@ -1,5 +1,5 @@
 /**
- * CEPALSTAT Diagnostic Dashboard Application Logic
+ * CEPAL Diagnostic Dashboard Application Logic
  */
 
 // Application State
@@ -121,7 +121,7 @@ async function fetchThematicTree() {
     
     try {
         const response = await fetch(API_TREE);
-        if (!response.ok) throw new Error('Error al conectar con la API de CEPALSTAT');
+        if (!response.ok) throw new Error('Error al conectar con la API de la CEPAL');
         
         const data = await response.json();
         appState.treeData = data.body;
@@ -334,7 +334,7 @@ async function selectIndicator(indicator) {
             <div style="color: var(--accent-red); font-weight: 500;">
                 <i class="fa-solid fa-triangle-exclamation"></i> Error al cargar datos para este indicador.
                 <p style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.5rem;">
-                    La API de CEPALSTAT no devolvió datos estructurados para Colombia/ALC en este indicador o el indicador es de tipo cualitativo. Por favor, selecciona otro del árbol.
+                    La API de la CEPAL no devolvió datos estructurados para Colombia/ALC en este indicador o el indicador es de tipo cualitativo. Por favor, selecciona otro del árbol.
                 </p>
             </div>
         `;
@@ -1378,7 +1378,7 @@ async function fetchPyramidData(indicatorId) {
             <div style="color: var(--accent-red); font-weight: 500;">
                 <i class="fa-solid fa-triangle-exclamation"></i> Error al cargar datos para este indicador estructural.
                 <p style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.5rem;">
-                    La API de CEPALSTAT no respondió correctamente o el indicador no tiene datos estructurados para los territorios seleccionados.
+                    La API de la CEPAL no respondió correctamente o el indicador no tiene datos estructurados para los territorios seleccionados.
                 </p>
             </div>
         `;
@@ -2226,7 +2226,7 @@ async function generateFullPrintReport(reportType = 'executive') {
             </div>
             
             <div style="margin-bottom: 2rem; color: var(--text-muted); font-size: 10pt; text-align: center;">
-                <strong>Fecha de Emisión:</strong> ${new Date().toLocaleDateString('es-ES')} | <strong>Origen de Datos:</strong> API Oficial CEPALSTAT
+                <strong>Fecha de Emisión:</strong> ${new Date().toLocaleDateString('es-ES')} | <strong>Origen de Datos:</strong> API Oficial de la CEPAL
             </div>
             
             <div class="print-section-title" style="font-family: var(--font-heading); font-size: 15pt; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
@@ -3176,7 +3176,7 @@ function exportReportToWord(reportHtml) {
               xmlns="http://www.w3.org/TR/REC-html40">
         <head>
             <meta charset="utf-8">
-            <title>Reporte Diagnóstico CEPALSTAT</title>
+            <title>Reporte Diagnóstico CEPAL</title>
             <style>
                 body { font-family: 'Arial', sans-serif; color: #334155; line-height: 1.6; background-color: #ffffff; }
                 h1 { font-family: 'Arial', sans-serif; font-size: 24pt; font-weight: 700; color: #0f172a; margin-bottom: 5px; text-align: center; }
@@ -3202,7 +3202,7 @@ function exportReportToWord(reportHtml) {
         type: 'application/msword;charset=utf-8'
     });
     
-    const filename = `reporte_diagnostico_cepalstat_${new Date().toISOString().slice(0,10)}.doc`;
+    const filename = `reporte_diagnostico_cepal_${new Date().toISOString().slice(0,10)}.doc`;
     
     if (navigator.msSaveBlob) {
         navigator.msSaveBlob(blob, filename);
@@ -3256,14 +3256,14 @@ async function triggerReportGeneration() {
         reportHtml += `
             <div class="print-page" style="page-break-after: always; padding: 3cm 2cm; text-align: center;">
                 <div style="margin-top: 5cm; margin-bottom: 2rem; padding-bottom: 2rem; border-bottom: 3px solid var(--accent-blue);">
-                    <h1 style="font-family: var(--font-heading); font-size: 28pt; font-weight: 800; color: #ffffff; margin-bottom: 0.5rem; letter-spacing: -1px;">Reporte Diagnóstico CEPALSTAT</h1>
+                    <h1 style="font-family: var(--font-heading); font-size: 28pt; font-weight: 800; color: #ffffff; margin-bottom: 0.5rem; letter-spacing: -1px;">Reporte Diagnóstico CEPAL</h1>
                     <h2 style="font-family: var(--font-body); font-size: 16pt; color: var(--text-secondary); font-weight: 400; margin-top: 0;">Análisis de Indicadores: Colombia vs. América Latina y el Caribe</h2>
                 </div>
                 
                 <div style="margin: 3rem 0; color: var(--text-secondary); font-size: 11pt; line-height: 1.8;">
                     <strong>Departamento de Análisis Regional</strong><br>
                     <strong>Fecha de Emisión:</strong> ${new Date().toLocaleDateString('es-ES')}<br>
-                    <strong>Origen de Datos:</strong> API Oficial de CEPALSTAT
+                    <strong>Origen de Datos:</strong> API Oficial de la CEPAL
                 </div>
                 
                 <div style="margin-top: 5cm; padding: 1.25rem; border-radius: 12px; background: rgba(59, 130, 246, 0.05); border: 1px solid rgba(59, 130, 246, 0.15); font-size: 10pt; color: var(--text-secondary); max-width: 500px; margin-left: auto; margin-right: auto; text-align: left;">
@@ -3799,7 +3799,7 @@ function downloadXlsReport() {
                 <x:ExcelWorkbook>
                     <x:ExcelWorksheets>
                         <x:ExcelWorksheet>
-                            <x:Name>Indicadores CEPALSTAT</x:Name>
+                            <x:Name>Indicadores CEPAL</x:Name>
                             <x:WorksheetOptions>
                                 <x:DisplayGridlines/>
                             </x:WorksheetOptions>
@@ -3823,13 +3823,13 @@ function downloadXlsReport() {
         <body>
             <table>
                 <tr>
-                    <td colspan="8" class="header-title">Listado de Indicadores Comparativos CEPALSTAT</td>
+                    <td colspan="8" class="header-title">Listado de Indicadores Comparativos CEPAL</td>
                 </tr>
                 <tr>
                     <td colspan="8" class="meta-cell">
                         <strong>Ámbito Geográfico:</strong> Colombia vs. América Latina y el Caribe (ALC)<br>
                         <strong>Fecha de Generación:</strong> ${new Date().toLocaleDateString('es-ES')}<br>
-                        <strong>Origen de Datos:</strong> API Oficial de CEPALSTAT (Sistemas de Indicadores)<br>
+                        <strong>Origen de Datos:</strong> API Oficial de la CEPAL (Sistemas de Indicadores)<br>
                         <strong>Total de Registros:</strong> ${sortedResults.length} indicadores comparados
                     </td>
                 </tr>
@@ -3871,7 +3871,7 @@ function downloadXlsReport() {
     `;
     
     // Create Blob and trigger download
-    const filename = `listado_completo_cepalstat_${new Date().toISOString().slice(0,10)}.xls`;
+    const filename = `listado_completo_cepal_${new Date().toISOString().slice(0,10)}.xls`;
     const blob = new Blob(['\ufeff' + xlsHtml], {
         type: 'application/vnd.ms-excel;charset=utf-8'
     });
