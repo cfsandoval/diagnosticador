@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Dashboard interactivo para el análisis diagnóstico comparativo de indicadores socioeconómicos y demográficos entre Colombia y América Latina utilizando la API de CEPALSTAT.">
+    <title>Diagnóstico CEPALSTAT - Comparativo Colombia vs. América Latina y el Caribe</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="styles.css">
+    
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <!-- Top Global Navbar -->
+    <header class="global-navbar">
+        <div class="brand">
+            <i class="fa-solid fa-square-poll-vertical brand-icon" style="font-size: 1.5rem; background: linear-gradient(135deg, var(--color-colombia) 0%, var(--color-alc) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"></i>
+            <span class="brand-text">Portal de Diagnóstico CEPALSTAT</span>
+        </div>
+        <div class="navbar-actions" style="display: flex; gap: 0.75rem;">
+            <button class="nav-btn" id="btn-export-xls" onclick="openXlsExportModal()" style="background: linear-gradient(135deg, var(--accent-green) 0%, rgba(16,185,129,0.85) 100%); color: #0b0f19; font-weight: 600; padding: 0.5rem 1rem; border-radius: 6px; border: none; display: flex; align-items: center; gap: 0.5rem; cursor: pointer; transition: var(--transition-smooth);">
+                <i class="fa-solid fa-file-excel"></i>
+                <span>Listado Excel (.xls)</span>
+            </button>
+            <button class="nav-btn active" id="btn-export-pdf" onclick="openReportModal()" style="background: linear-gradient(135deg, var(--accent-blue) 0%, rgba(59,130,246,0.85) 100%); color: #0b0f19; font-weight: 600; padding: 0.5rem 1rem; border-radius: 6px; border: none; display: flex; align-items: center; gap: 0.5rem; cursor: pointer; transition: var(--transition-smooth);">
+                <i class="fa-solid fa-file-pdf"></i>
+                <span>Exportar Reporte (PDF)</span>
+            </button>
+        </div>
+    </header>
+
+    <div class="app-container" id="app">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar" style="height: 100%; display: flex; flex-direction: column; overflow: hidden;">
+            <!-- Scrollable Content -->
+            <div style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 1.5rem; padding: 1.5rem 1rem;">
+                <!-- SECTION 0: RESUMEN DE BRECHAS CRÍTICAS Y METODOLOGÍA -->
+                <div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; padding: 0 0.5rem;">
+                        <i class="fa-solid fa-scale-unbalanced-left" style="color: var(--color-colombia); font-size: 0.875rem;"></i>
+                        <span class="metadata-subtitle" style="font-size: 0.75rem; letter-spacing: 0.5px; font-weight: 600; text-transform: uppercase;">Diagnóstico y Guías</span>
+                    </div>
+                    <ul class="tree-list">
+                        <li class="structures-list-item" id="sidebar-brechas-btn" onclick="selectBrechasSection()">
+                            <i class="fa-solid fa-square-poll-horizontal"></i>
+                            <span>Brechas Críticas (DRE)</span>
+                        </li>
+                        <li class="structures-list-item" id="sidebar-metodologia-btn" onclick="selectMetodologiaSection()">
+                            <i class="fa-solid fa-book"></i>
+                            <span>Metodología Analítica</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- SECTION 2: EXPLORADOR GENERAL (ARBOL Y BUSQUEDA) -->
+                <div style="border-top: 1px solid var(--border-color); padding-top: 1.5rem; display: flex; flex-direction: column; flex: 1; min-height: 0;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; padding: 0 0.5rem;">
+                        <i class="fa-solid fa-compass" style="color: var(--accent-blue); font-size: 0.875rem;"></i>
+                        <span class="metadata-subtitle" style="font-size: 0.75rem; letter-spacing: 0.5px; font-weight: 600; text-transform: uppercase;">Explorador de Indicadores</span>
+                    </div>
+                    
+                    <div class="search-container" style="margin-bottom: 0.75rem;">
+                        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                        <input type="text" id="indicator-search" class="search-input" placeholder="Buscar 2,000+ indicadores..." autocomplete="off">
+                    </div>
+
+                    <div class="tree-container" id="tree-container" style="flex: 1; overflow-y: auto; min-height: 250px;">
+                        <div class="tree-loading" id="tree-loading">
+                            <div class="spinner"></div>
+                            <span>Cargando árbol temático...</span>
+                        </div>
+                        <ul class="tree-list" id="thematic-tree">
+                            <!-- Dynamic tree nodes will be inserted here -->
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- SECTION 1: ESTRUCTURA DEMOGRÁFICA (PIRÁMIDES) -->
+                <div style="border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; padding: 0 0.5rem;">
+                        <i class="fa-solid fa-users-line" style="color: var(--color-alc); font-size: 0.875rem;"></i>
+                        <span class="metadata-subtitle" style="font-size: 0.75rem; letter-spacing: 0.5px; font-weight: 600; text-transform: uppercase;">Estructuras de Edad y Sexo</span>
+                    </div>
+                    <ul class="tree-list" id="structures-indicator-list">
+                        <!-- Grouped indicators will be populated here -->
+                    </ul>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content" id="main-content">
+            
+            <!-- SECTION 1: GENERAL INDICATOR EXPLORER -->
+            <div id="explorer-section" style="height: 100%;">
+                <!-- Empty State / Landing Screen -->
+                <section class="empty-state" id="empty-state">
+                    <div class="empty-icon-wrapper">
+                        <i class="fa-solid fa-chart-line"></i>
+                    </div>
+                    <h1 class="empty-title">Explorador General de Series CEPALSTAT</h1>
+                    <p class="empty-description">
+                        Consulta y compara de forma directa datos históricos entre **Colombia** y el promedio de **América Latina y el Caribe** a través de la base de datos oficial de la CEPAL.
+                    </p>
+                    <div class="empty-steps">
+                        <div class="empty-step">
+                            <i class="fa-solid fa-search"></i>
+                            <span>Navega por el árbol o busca en la caja del panel de la izquierda.</span>
+                        </div>
+                        <div class="empty-step">
+                            <i class="fa-solid fa-sliders"></i>
+                            <span>Selecciona el indicador y aplica las desagregaciones necesarias.</span>
+                        </div>
+                        <div class="empty-step">
+                            <i class="fa-solid fa-chart-bar"></i>
+                            <span>Exporta datos a CSV o lee el diagnóstico estadístico autogenerado.</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Dashboard Contents (Hidden by default, shown when indicator selected) -->
+                <div id="dashboard-container" style="display: none;">
+                    <!-- Dashboard Header -->
+                    <header class="dashboard-header">
+                        <div class="dashboard-title-area">
+                            <span class="indicator-subtitle" id="dashboard-indicator-area">Demográficos y Sociales / Demográficos / Población</span>
+                            <h1 class="indicator-title" id="dashboard-indicator-name">Población total, según sexo</h1>
+                        </div>
+                        <div class="api-badge">
+                            <span class="dot"></span>
+                            <span>API CEPALSTAT</span>
+                        </div>
+                    </header>
+
+                    <!-- Dashboard Body -->
+                    <div class="dashboard-body">
+                        <!-- KPI Cards Grid -->
+                        <section class="kpi-grid">
+                            <!-- Colombia Value -->
+                            <div class="card card-colombia">
+                                <div class="kpi-title colombia">
+                                    <span>Colombia</span>
+                                    <i class="fa-solid fa-flag"></i>
+                                </div>
+                                <div class="kpi-value" id="kpi-colombia-val">-</div>
+                                <div class="kpi-trend" id="kpi-colombia-trend">
+                                    <i class="fa-solid fa-minus"></i> <span>Sin datos</span>
+                                </div>
+                            </div>
+
+                            <!-- LAC Value -->
+                            <div class="card card-alc">
+                                <div class="kpi-title alc">
+                                    <span>América Latina y el Caribe</span>
+                                    <i class="fa-solid fa-globe"></i>
+                                </div>
+                                <div class="kpi-value" id="kpi-alc-val">-</div>
+                                <div class="kpi-trend" id="kpi-alc-trend">
+                                    <i class="fa-solid fa-minus"></i> <span>Sin datos</span>
+                                </div>
+                            </div>
+
+                            <!-- Absolute & Pct Gap -->
+                            <div class="card card-gap">
+                                <div class="kpi-title gap">
+                                    <span>Brecha de Valor</span>
+                                    <i class="fa-solid fa-scale-unbalanced"></i>
+                                </div>
+                                <div class="kpi-value" id="kpi-gap-val">-</div>
+                                <div class="kpi-trend" id="kpi-gap-pct">
+                                    <i class="fa-solid fa-minus"></i> <span>Diferencia</span>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- Main Grid: Chart & Filters -->
+                        <div class="dashboard-main-grid">
+                            <!-- Left Side: Chart and Diagnostics -->
+                            <div style="display: flex; flex-direction: column; gap: 2rem;">
+                                <!-- Chart Card -->
+                                <section class="card chart-card">
+                                    <div class="loading-overlay" id="chart-loading">
+                                        <div class="spinner"></div>
+                                        <span>Cargando datos del indicador...</span>
+                                    </div>
+                                    <div class="chart-header">
+                                        <div>
+                                            <h2 class="chart-title">Evolución Histórica y Comparativa</h2>
+                                            <span style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">
+                                                * Los datos de 2025 en adelante corresponden a proyecciones (líneas discontinuas o barras translúcidas).
+                                            </span>
+                                        </div>
+                                        <div class="chart-controls">
+                                            <div class="btn-group">
+                                                <button class="btn-tab active" id="btn-chart-line" onclick="setChartType('line')">
+                                                    <i class="fa-solid fa-chart-line"></i> Líneas
+                                                </button>
+                                                <button class="btn-tab" id="btn-chart-bar" onclick="setChartType('bar')">
+                                                    <i class="fa-solid fa-chart-bar"></i> Barras
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="chart-wrapper">
+                                        <canvas id="indicator-chart"></canvas>
+                                    </div>
+                                </section>
+
+                                <!-- Automated Diagnostic Card -->
+                                <section class="card diagnostic-card">
+                                    <div class="diagnostic-header">
+                                        <i class="fa-solid fa-robot diagnostic-icon"></i>
+                                        <h2 class="diagnostic-title">Diagnóstico Analítico Automatizado</h2>
+                                    </div>
+                                    <div class="diagnostic-text" id="diagnostic-content">
+                                        Analizando datos del indicador para generar el reporte de diagnóstico...
+                                    </div>
+                                </section>
+                            </div>
+
+                            <!-- Right Side: Secondary Filters -->
+                            <div>
+                                <section class="card filter-card">
+                                    <h2 class="filter-section-title">
+                                        <i class="fa-solid fa-sliders"></i>
+                                        Desagregación
+                                    </h2>
+                                    <div class="filter-list" id="dynamic-filters">
+                                        <div class="filter-group">
+                                            <label class="filter-label">Filtros</label>
+                                            <div style="color: var(--text-muted); font-size: 0.875rem;">
+                                                Selecciona un indicador con dimensiones adicionales para ver filtros.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </section>
+                            </div>
+                        </div>
+
+                        <!-- Metadata Section -->
+                        <section class="card metadata-card">
+                            <h2 class="filter-section-title">
+                                <i class="fa-solid fa-info-circle"></i>
+                                Ficha Técnica y Metadatos
+                            </h2>
+                            <div class="metadata-grid">
+                                <div class="metadata-section">
+                                    <span class="metadata-subtitle">Definición / Unidad de Medida</span>
+                                    <div class="metadata-content" id="meta-definition">No disponible.</div>
+                                </div>
+                                <div class="metadata-section">
+                                    <span class="metadata-subtitle">Fuentes Originales</span>
+                                    <div class="metadata-content" id="meta-sources">No disponible.</div>
+                                </div>
+                                <div class="metadata-section" id="notes-section">
+                                    <span class="metadata-subtitle">Notas al Pie (CEPAL)</span>
+                                    <div class="metadata-content" id="meta-footnotes">No disponible.</div>
+                                </div>
+                            </div>
+                        </section>
+
+
+                        <!-- Data Table Section -->
+                        <section class="card table-card">
+                            <div class="table-header">
+                                <h2 class="chart-title">Tabla de Datos Comparativa</h2>
+                                <button class="btn-primary" id="btn-export-csv" onclick="exportToCSV()">
+                                    <i class="fa-solid fa-download"></i> Exportar CSV
+                                </button>
+                            </div>
+                            <div class="table-wrapper">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th class="col-year">Año</th>
+                                            <th class="col-colombia">Colombia</th>
+                                            <th class="col-alc">América Latina y el Caribe</th>
+                                            <th class="col-gap">Brecha Absoluta</th>
+                                            <th class="col-pct">Brecha %</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="data-table-body">
+                                        <!-- Dynamic rows will be inserted here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 2: SPECIALIZED DEMOGRAPHIC AND SOCIAL STRUCTURES (PYRAMIDS) -->
+            <div id="structures-section" style="display: none; height: 100%;">
+                <!-- Dashboard Header -->
+                <header class="dashboard-header">
+                    <div class="dashboard-title-area">
+                        <span class="indicator-subtitle">Estructura Demográfica y Social</span>
+                        <h1 class="indicator-title" id="pyramid-indicator-name">Población total por grupos de edad</h1>
+                    </div>
+                    <div class="api-badge" style="background: rgba(168, 85, 247, 0.1); border-color: rgba(168, 85, 247, 0.2);">
+                        <span class="dot" style="background-color: var(--color-alc); box-shadow: 0 0 8px var(--color-alc);"></span>
+                        <span style="color: #c084fc;">Módulo Pirámides</span>
+                    </div>
+                </header>
+
+                <!-- Dashboard Body -->
+                <div class="dashboard-body">
+                    <!-- Pyramid Controls Card -->
+                    <div class="card" style="margin-bottom: 1.5rem; display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <label class="filter-label" style="margin-bottom: 0;">Año de Consulta:</label>
+                            <select class="select-control" id="pyramid-year-select" style="width: auto; padding: 0.5rem 2.5rem 0.5rem 1rem;" onchange="onPyramidYearChange(this.value)">
+                                <!-- Dynamic years -->
+                            </select>
+                        </div>
+                        <!-- Dynamic secondary filters (like Area, Poverty, Pension Type) populated by JS -->
+                        <div style="display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: center;" id="pyramid-secondary-filters">
+                        </div>
+                    </div>
+
+                    <!-- Side-by-side Pyramids Grid -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+                        <!-- Colombia Pyramid Card -->
+                        <div class="card chart-card">
+                            <div class="loading-overlay" id="pyramid-loading-col">
+                                <div class="spinner"></div>
+                                <span>Cargando pirámide de Colombia...</span>
+                            </div>
+                            <div class="chart-header">
+                                <h2 class="chart-title"><i class="fa-solid fa-flag" style="color: var(--color-colombia);"></i> Colombia</h2>
+                                <span style="font-size: 0.875rem; color: var(--text-secondary);" id="pyramid-year-colombia">Año: -</span>
+                            </div>
+                            <div class="chart-wrapper" style="height: 420px;">
+                                <canvas id="pyramid-chart-colombia"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- ALC Pyramid Card -->
+                        <div class="card chart-card">
+                            <div class="loading-overlay" id="pyramid-loading-alc">
+                                <div class="spinner"></div>
+                                <span>Cargando pirámide de América Latina...</span>
+                            </div>
+                            <div class="chart-header">
+                                <h2 class="chart-title"><i class="fa-solid fa-globe" style="color: var(--color-alc);"></i> América Latina y el Caribe</h2>
+                                <span style="font-size: 0.875rem; color: var(--text-secondary);" id="pyramid-year-alc">Año: -</span>
+                            </div>
+                            <div class="chart-wrapper" style="height: 420px;">
+                                <canvas id="pyramid-chart-alc"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Demographic Structure Diagnostics -->
+                    <div class="card diagnostic-card" id="pyramid-diagnostic-card">
+                        <div class="diagnostic-header">
+                            <i class="fa-solid fa-shield-halved diagnostic-icon" style="color: var(--accent-green); background: rgba(16, 185, 129, 0.1);"></i>
+                            <h2 class="diagnostic-title">Análisis Estructural y Demográfico Comparativo</h2>
+                        </div>
+                        <div id="pyramid-diagnostic-content" class="diagnostic-text">
+                            Cargando diagnóstico demográfico comparativo...
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 3: RESUMEN DE BRECHAS CRÍTICAS -->
+            <div id="brechas-section" style="display: none; height: 100%;">
+                <!-- Dashboard Header -->
+                <header class="dashboard-header">
+                    <div class="dashboard-title-area">
+                        <span class="indicator-subtitle">Diagnóstico Comparativo Nacional</span>
+                        <h1 class="indicator-title">Resumen de Brechas Críticas y Desviación Estadística</h1>
+                    </div>
+                    <div class="api-badge" style="background: rgba(255, 215, 0, 0.1); border-color: rgba(255, 215, 0, 0.2);">
+                        <span class="dot" style="background-color: var(--color-colombia); box-shadow: 0 0 8px var(--color-colombia);"></span>
+                        <span style="color: var(--color-colombia); font-weight: 600;">Módulo Brechas</span>
+                    </div>
+                </header>
+
+                <!-- Dashboard Body -->
+                <div class="dashboard-body">
+                    <!-- Standalone Brechas Card (Not collapsible) -->
+                    <section class="card diagnostic-card">
+                        <div class="diagnostic-header">
+                            <i class="fa-solid fa-scale-unbalanced-left diagnostic-icon" style="color: var(--color-colombia); background: rgba(255, 215, 0, 0.1);"></i>
+                            <div>
+                                <h2 class="chart-title">Desviación Relativa Estándar (DRE) de Colombia frente a América Latina y el Caribe</h2>
+                                <span style="font-size: 0.8125rem; color: var(--text-secondary); display: block; margin-top: 0.25rem;">
+                                    Comparativa de indicadores estructurales clave, ordenados de forma descendente por la magnitud de su desviación absoluta (|DRE|).
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <div class="table-wrapper" style="border: 1px solid var(--border-color); border-radius: 10px; margin-top: 1.5rem;">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 30%;">Indicador</th>
+                                        <th style="width: 15%; text-align: right;">Colombia</th>
+                                        <th style="width: 15%; text-align: right;">Promedio ALC</th>
+                                        <th style="width: 15%; text-align: right;">DRE</th>
+                                        <th style="width: 25%;">Interpretación del Desvío</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="brechas-criticas-standalone-table-body">
+                                    <!-- Dynamic rows populated by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div style="margin-top: 1.5rem; font-size: 0.875rem; color: var(--text-secondary); line-height: 1.6; display: flex; flex-direction: column; gap: 0.75rem;">
+                            <p>
+                                <i class="fa-solid fa-circle-info" style="color: var(--accent-blue);"></i> <strong>Metodología de Desviación Estadística:</strong>
+                                La Desviación Relativa Estándar (DRE) es una métrica normalizada definida matemáticamente como:
+                                <code style="background: rgba(255,255,255,0.05); padding: 0.2rem 0.4rem; border-radius: 4px; font-family: monospace; font-size: 0.9rem;">DRE = (Colombia - ALC) / ALC</code>.
+                            </p>
+                            <p>
+                                Este coeficiente indica la distancia proporcional a la que se encuentra Colombia del promedio de América Latina y el Caribe para una variable específica:
+                            </p>
+                            <ul style="list-style: none; padding-left: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                                <li>🟢 <strong>Valores favorables para el país:</strong> Menores emisiones de CO₂ o menor relación de dependencia en comparación con el conjunto de la región.</li>
+                                <li>🔴 <strong>Valores desfavorables o rezagos estructurales:</strong> Mayor incidencia de desocupación laboral, mayor incidencia de pobreza o un menor ingreso bruto per cápita.</li>
+                            </ul>
+                        </div>
+                    </section>
+                </div>
+            </div>
+            
+            <!-- SECTION 4: METODOLOGÍA ANALÍTICA -->
+            <div id="metodologia-section" style="display: none; height: 100%;">
+                <header class="dashboard-header">
+                    <div class="dashboard-title-area">
+                        <span class="indicator-subtitle">Algoritmos de Diagnóstico Local</span>
+                        <h1 class="indicator-title">Metodología y Fórmulas del Análisis Inteligente</h1>
+                    </div>
+                    <div class="api-badge" style="background: rgba(59, 130, 246, 0.1); border-color: rgba(59, 130, 246, 0.2);">
+                        <span class="dot" style="background-color: var(--accent-blue); box-shadow: 0 0 8px var(--accent-blue);"></span>
+                        <span style="color: var(--accent-blue); font-weight: 600;">Módulo Metodológico</span>
+                    </div>
+                </header>
+
+                <div class="dashboard-body" style="padding-bottom: 2rem;">
+                    <!-- Card 1: Fórmulas Generales -->
+                    <section class="card diagnostic-card" style="margin-bottom: 1.5rem;">
+                        <div class="diagnostic-header">
+                            <i class="fa-solid fa-calculator diagnostic-icon" style="color: var(--accent-blue); background: rgba(59, 130, 246, 0.1);"></i>
+                            <div>
+                                <h2 class="chart-title">1. Fórmulas Generales y Desviación Estadística</h2>
+                                <span style="font-size: 0.8125rem; color: var(--text-secondary); display: block; margin-top: 0.25rem;">
+                                    Métricas para normalizar brechas y tasas de crecimiento en el Explorador General.
+                                </span>
+                            </div>
+                        </div>
+                        <div style="margin-top: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem;">
+                            <!-- DRE Formula -->
+                            <div style="background: rgba(15, 23, 42, 0.4); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                                <h4 style="color: var(--accent-blue); margin-bottom: 0.5rem; font-family: var(--font-heading);">Desviación Relativa Estándar (DRE)</h4>
+                                <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+                                    Permite comparar la brecha de variables con diferentes magnitudes (ej: PIB per cápita en miles de USD vs. Emisiones de CO₂ en unidades simples).
+                                </p>
+                                <div style="font-size: 1.25rem; font-family: monospace; text-align: center; background: rgba(0,0,0,0.2); padding: 0.75rem; border-radius: 6px; color: var(--text-primary); margin-bottom: 0.75rem; border: 1px solid rgba(255,255,255,0.03);">
+                                    DRE = (Colombia - ALC) / ALC
+                                </div>
+                                <ul style="font-size: 0.85rem; color: var(--text-muted); list-style: square; padding-left: 1.25rem; display: flex; flex-direction: column; gap: 0.25rem;">
+                                    <li><strong>DRE = 0:</strong> Comportamiento nacional idéntico al promedio regional.</li>
+                                    <li><strong>DRE &gt; 0:</strong> Desempeño nacional superior en magnitud (ej: +0.62 desempleo = 62% por encima).</li>
+                                    <li><strong>DRE &lt; 0:</strong> Desempeño nacional inferior en magnitud (ej: -0.30 PIB = 30% por debajo).</li>
+                                </ul>
+                            </div>
+
+                            <!-- CAGR Formula -->
+                            <div style="background: rgba(15, 23, 42, 0.4); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                                <h4 style="color: var(--accent-blue); margin-bottom: 0.5rem; font-family: var(--font-heading);">Tasa de Crecimiento Anual Compuesto (CAGR)</h4>
+                                <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+                                    Calcula la velocidad constante a la que un indicador crece o se contrae anualmente entre dos puntos de tiempo.
+                                </p>
+                                <div style="font-size: 1.25rem; font-family: monospace; text-align: center; background: rgba(0,0,0,0.2); padding: 0.75rem; border-radius: 6px; color: var(--text-primary); margin-bottom: 0.75rem; border: 1px solid rgba(255,255,255,0.03);">
+                                    CAGR = (V_final / V_inicial)^(1 / n) - 1
+                                </div>
+                                <p style="font-size: 0.85rem; color: var(--text-muted);">
+                                    Donde <strong>n</strong> es el número de años transcurridos. Se calcula de forma independiente para el período de registro histórico real (nacional vs regional) y el período de proyección futura.
+                                </p>
+                            </div>
+
+                            <!-- Convergence Logic -->
+                            <div style="background: rgba(15, 23, 42, 0.4); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                                <h4 style="color: var(--accent-blue); margin-bottom: 0.5rem; font-family: var(--font-heading);">Lógica de Trayectoria: Convergencia vs. Divergencia</h4>
+                                <p style="font-size: 0.9rem; color: var(--text-secondary);">
+                                    El sistema calcula el valor absoluto de la brecha inicial y final de la serie histórica. Si <code>|Brecha_final| &lt; |Brecha_inicial|</code>, se diagnostica un proceso de <strong>convergencia</strong> (reducción de brechas). Si es al contrario, se concluye un proceso de <strong>divergencia estructural</strong>.
+                                </p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Card 2: Pirámides y Estructuras -->
+                    <section class="card diagnostic-card" style="margin-bottom: 1.5rem;">
+                        <div class="diagnostic-header">
+                            <i class="fa-solid fa-users-line diagnostic-icon" style="color: var(--color-alc); background: rgba(168, 85, 247, 0.1);"></i>
+                            <div>
+                                <h2 class="chart-title">2. Clasificación y Dependencia Demográfica</h2>
+                                <span style="font-size: 0.8125rem; color: var(--text-secondary); display: block; margin-top: 0.25rem;">
+                                    Algoritmos aplicados para clasificar el perfil de población y medir la carga pasiva.
+                                </span>
+                            </div>
+                        </div>
+                        <div style="margin-top: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem;">
+                            <!-- Demographics logic -->
+                            <div style="background: rgba(15, 23, 42, 0.4); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                                <h4 style="color: var(--color-alc); margin-bottom: 0.5rem; font-family: var(--font-heading);">Clasificación del Perfil Demográfico</h4>
+                                <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+                                    Basado en los pesos relativos de la población menor de 15 años y mayor de 64 años, la pirámide se tipifica de forma automática en tres perfiles:
+                                </p>
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 0.5rem;">
+                                    <div style="background: rgba(0,0,0,0.15); padding: 0.75rem; border-radius: 6px; border-left: 3px solid #ef4444;">
+                                        <strong style="color: #f87171; font-size: 0.85rem;">Expansiva (Pagoda)</strong>
+                                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.25rem;">Jóvenes &gt; 30%. Alta natalidad, población joven y rápido crecimiento.</p>
+                                    </div>
+                                    <div style="background: rgba(0,0,0,0.15); padding: 0.75rem; border-radius: 6px; border-left: 3px solid #10b981;">
+                                        <strong style="color: #34d399; font-size: 0.85rem;">Regresiva (Bulbo)</strong>
+                                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.25rem;">Mayores &gt; 12% y Jóvenes &lt; 20%. Natalidad baja y envejecimiento demográfico acelerado.</p>
+                                    </div>
+                                    <div style="background: rgba(0,0,0,0.15); padding: 0.75rem; border-radius: 6px; border-left: 3px solid #3b82f6;">
+                                        <strong style="color: #60a5fa; font-size: 0.85rem;">Estacionaria (Campana)</strong>
+                                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.25rem;">Cualquier otro caso. Natalidad en descenso, crecimiento moderado.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Dependency Ratio -->
+                            <div style="background: rgba(15, 23, 42, 0.4); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                                <h4 style="color: var(--color-alc); margin-bottom: 0.5rem; font-family: var(--font-heading);">Relación de Dependencia Demográfica</h4>
+                                <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+                                    Mide el número teórico de personas inactivas que dependen de cada 100 personas activas.
+                                </p>
+                                <div style="font-size: 1.25rem; font-family: monospace; text-align: center; background: rgba(0,0,0,0.2); padding: 0.75rem; border-radius: 6px; color: var(--text-primary); margin-bottom: 0.75rem; border: 1px solid rgba(255,255,255,0.03);">
+                                    Dependencia = ((Pob_0_14 + Pob_65_mas) / Pob_15_64) * 100
+                                </div>
+                                <p style="font-size: 0.85rem; color: var(--text-muted);">
+                                    El sistema contrasta los índices para identificar si el país goza de un <strong>bono demográfico</strong> (tasa de dependencia menor a la regional) o si padece una alta tasa de sostenimiento pasivo.
+                                </p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Card 3: Brechas de Género y Tasas -->
+                    <section class="card diagnostic-card" style="margin-bottom: 1.5rem;">
+                        <div class="diagnostic-header">
+                            <i class="fa-solid fa-venus-mars diagnostic-icon" style="color: var(--accent-green); background: rgba(16, 185, 129, 0.1);"></i>
+                            <div>
+                                <h2 class="chart-title">3. Brecha de Género y Desviaciones en Tasas</h2>
+                                <span style="font-size: 0.8125rem; color: var(--text-secondary); display: block; margin-top: 0.25rem;">
+                                    Análisis de disparidades e inconsistencias en indicadores socioeconómicos desglosados.
+                                </span>
+                            </div>
+                        </div>
+                        <div style="margin-top: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem;">
+                            <!-- Gender Gap -->
+                            <div style="background: rgba(15, 23, 42, 0.4); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                                <h4 style="color: var(--accent-green); margin-bottom: 0.5rem; font-family: var(--font-heading);">Identificación de la Disparidad Máxima</h4>
+                                <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+                                    Para tasas (participación, analfabetismo, pensiones), el algoritmo recorre todos los grupos de edad y realiza una diferencia por sexo:
+                                </p>
+                                <div style="font-size: 1.15rem; font-family: monospace; text-align: center; background: rgba(0,0,0,0.2); padding: 0.75rem; border-radius: 6px; color: var(--text-primary); margin-bottom: 0.75rem; border: 1px solid rgba(255,255,255,0.03);">
+                                    Disparidad_edad = Tasa_hombres - Tasa_mujeres
+                                </div>
+                                <p style="font-size: 0.85rem; color: var(--text-muted);">
+                                    El sistema detecta el grupo de edad que presenta el mayor valor absoluto de esta disparidad, reportando la brecha máxima de género y en favor de qué sector ocurre.
+                                </p>
+                            </div>
+
+                            <!-- Gender average gap -->
+                            <div style="background: rgba(15, 23, 42, 0.4); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                                <h4 style="color: var(--accent-green); margin-bottom: 0.5rem; font-family: var(--font-heading);">Brecha de Género General vs. Regional</h4>
+                                <p style="font-size: 0.9rem; color: var(--text-secondary);">
+                                    Calcula los promedios globales de hombres y mujeres para Colombia y ALC a lo largo de las cohortes, evaluando si el sesgo de género general de Colombia se encuentra ampliado o atenuado frente al comportamiento de la media regional.
+                                </p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Card 4: Arquitectura del Motor NLP -->
+                    <section class="card diagnostic-card">
+                        <div class="diagnostic-header">
+                            <i class="fa-solid fa-robot diagnostic-icon" style="color: var(--color-colombia); background: rgba(255, 215, 0, 0.1);"></i>
+                            <div>
+                                <h2 class="chart-title">4. Arquitectura de Generación NLP (Narrativa Inteligente)</h2>
+                                <span style="font-size: 0.8125rem; color: var(--text-secondary); display: block; margin-top: 0.25rem;">
+                                    Cómo se convierten las métricas crudas en una narrativa inteligible en español.
+                                </span>
+                            </div>
+                        </div>
+                        <div style="margin-top: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem; font-size: 0.9rem; color: var(--text-secondary); line-height: 1.6;">
+                            <p>
+                                El sistema opera bajo una arquitectura estructurada de procesamiento estadístico secuencial:
+                            </p>
+                            <div style="display: flex; flex-direction: column; gap: 0.75rem; background: rgba(15, 23, 42, 0.3); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                                <div style="display: flex; gap: 1rem; align-items: flex-start;">
+                                    <div style="background: var(--accent-blue); color: #0b0f19; font-weight: 700; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 0.8rem; margin-top: 0.15rem;">1</div>
+                                    <div>
+                                        <strong style="color: var(--text-primary);">Consumo de API</strong>: Recupera los microdatos multidimensionales de CEPALSTAT.
+                                    </div>
+                                </div>
+                                <div style="display: flex; gap: 1rem; align-items: flex-start; border-top: 1px solid rgba(255,255,255,0.04); padding-top: 0.75rem;">
+                                    <div style="background: var(--color-alc); color: #0b0f19; font-weight: 700; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 0.8rem; margin-top: 0.15rem;">2</div>
+                                    <div>
+                                        <strong style="color: var(--text-primary);">Agregación Estadística</strong>: Computa las métricas derivadas (CAGR, DRE, tasas de dependencia, promedios por género y brechas máximas).
+                                    </div>
+                                </div>
+                                <div style="display: flex; gap: 1rem; align-items: flex-start; border-top: 1px solid rgba(255,255,255,0.04); padding-top: 0.75rem;">
+                                    <div style="background: var(--color-alc); color: #0b0f19; font-weight: 700; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 0.8rem; margin-top: 0.15rem;">3</div>
+                                    <div>
+                                        <strong style="color: var(--text-primary);">Clasificación y Reglas Lógicas</strong>: Ejecuta árboles de decisión lógicos para evaluar si la brecha se cierra, si hay bono demográfico, o cuál es el perfil piramidal.
+                                    </div>
+                                </div>
+                                <div style="display: flex; gap: 1rem; align-items: flex-start; border-top: 1px solid rgba(255,255,255,0.04); padding-top: 0.75rem;">
+                                    <div style="background: var(--color-colombia); color: #0b0f19; font-weight: 700; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 0.8rem; margin-top: 0.15rem;">4</div>
+                                    <div>
+                                        <strong style="color: var(--text-primary);">Compilación Dinámica de Plantillas</strong>: Mapea los resultados obtenidos e inyecta fragmentos de texto en español preestablecidos y dinámicos para constituir la narrativa final del diagnóstico.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+            </div>
+    </div>
+
+    <!-- Modal de Opciones de Reporte (PDF/Word) -->
+    <div id="report-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 600px; width: 90%; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden;">
+            <div class="modal-header">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <i class="fa-solid fa-file-export" style="font-size: 1.5rem; color: var(--accent-blue);"></i>
+                    <h3 class="modal-title" style="font-family: var(--font-heading); font-size: 1.25rem; font-weight: 700; color: var(--text-primary);">Exportar Reporte Personalizado</h3>
+                </div>
+                <button class="close-btn" onclick="closeReportModal()">&times;</button>
+            </div>
+            
+            <div class="modal-body" style="padding: 1.5rem; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 1.25rem;">
+                <!-- 1. Format Selection -->
+                <div>
+                    <label class="filter-label" style="display: block; margin-bottom: 0.5rem;">Formato de Exportación</label>
+                    <div class="btn-group" style="display: flex; width: 100%; background: rgba(15, 23, 42, 0.5); border: 1px solid var(--border-color); border-radius: 10px; padding: 3px;">
+                        <button class="btn-tab active" id="btn-report-format-pdf" onclick="setReportFormat('pdf')" style="flex: 1; padding: 0.6rem; font-size: 0.85rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem; border: none; cursor: pointer; border-radius: 8px;">
+                            <i class="fa-solid fa-file-pdf" style="color: var(--accent-red);"></i> Documento PDF (.pdf)
+                        </button>
+                        <button class="btn-tab" id="btn-report-format-word" onclick="setReportFormat('word')" style="flex: 1; padding: 0.6rem; font-size: 0.85rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem; border: none; cursor: pointer; border-radius: 8px;">
+                            <i class="fa-solid fa-file-word" style="color: var(--accent-blue);"></i> Documento Word (.doc)
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- 2. Presets Selection -->
+                <div>
+                    <label class="filter-label" style="display: block; margin-bottom: 0.5rem;">Preajustes de Configuración</label>
+                    <select class="select-control" id="report-preset-select" onchange="applyReportPreset(this.value)">
+                        <option value="active-only" selected>Solo indicador general activo</option>
+                        <option value="structural-only">Solo los 6 indicadores estructurales (Demografía y Sociedad)</option>
+                        <option value="full-preset">Completo (Indicador activo + 6 estructurales)</option>
+                        <option value="custom">Personalizado (Selección manual libre)</option>
+                    </select>
+                </div>
+                
+                <!-- 3. Indicators Selection checklist -->
+                <div style="display: flex; flex-direction: column; gap: 0.5rem; flex: 1; min-height: 250px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <label class="filter-label" style="margin-bottom: 0;">Seleccionar Indicadores a Incorporar</label>
+                        <div style="display: flex; gap: 0.5rem; font-size: 0.75rem;">
+                            <span onclick="selectAllReportIndicators(true)" style="color: var(--accent-blue); cursor: pointer; font-weight: 500;">Marcar todos</span>
+                            <span style="color: var(--text-muted);">|</span>
+                            <span onclick="selectAllReportIndicators(false)" style="color: var(--text-muted); cursor: pointer; font-weight: 500;">Desmarcar todos</span>
+                        </div>
+                    </div>
+                    
+                    <div class="search-container">
+                        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                        <input type="text" id="report-indicator-search" class="search-input" placeholder="Buscar indicadores en el listado..." oninput="filterReportIndicators(this.value)">
+                    </div>
+                    
+                    <div class="indicators-checklist-wrapper" style="flex: 1; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 10px; background: rgba(15, 23, 42, 0.4); min-height: 180px; padding: 0.5rem;">
+                        <div id="report-indicators-checklist" style="display: flex; flex-direction: column; gap: 0.25rem;">
+                            <!-- Checkboxes populated dynamically by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-footer" style="padding: 1.25rem 1.5rem; border-top: 1px solid var(--border-color); background: rgba(11, 15, 25, 0.4); display: flex; justify-content: flex-end; gap: 0.75rem;">
+                <button class="btn-secondary" onclick="closeReportModal()" style="padding: 0.5rem 1rem; border-radius: 6px; border: 1px solid var(--border-color); background: transparent; color: var(--text-secondary); font-weight: 500; cursor: pointer; transition: var(--transition-smooth);">Cancelar</button>
+                <button class="btn-primary" id="btn-confirm-print" onclick="triggerReportGeneration()" style="background: linear-gradient(135deg, var(--accent-blue) 0%, rgba(59,130,246,0.85) 100%); color: #0b0f19; font-weight: 600; padding: 0.5rem 1.25rem; border-radius: 6px; border: none; display: flex; align-items: center; gap: 0.5rem; cursor: pointer; transition: var(--transition-smooth);">
+                    <i class="fa-solid fa-file-export"></i> Generar y Exportar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Exportación a Excel (Completo / Masivo) -->
+    <div id="xls-export-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 600px; width: 90%; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden;">
+            <div class="modal-header">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <i class="fa-solid fa-file-excel" style="font-size: 1.5rem; color: var(--accent-green);"></i>
+                    <h3 class="modal-title" style="font-family: var(--font-heading); font-size: 1.25rem; font-weight: 700; color: var(--text-primary);">Exportar Listado de Indicadores a Excel</h3>
+                </div>
+                <button class="close-btn" onclick="closeXlsExportModal()">&times;</button>
+            </div>
+            
+            <div class="modal-body" style="padding: 1.5rem; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 1.25rem;">
+                <p style="font-size: 0.875rem; color: var(--text-secondary); line-height: 1.5;">
+                    Esta herramienta descarga la serie completa de cada indicador seleccionado, filtra el último año en común que comparten <strong>Colombia</strong> y <strong>América Latina y el Caribe</strong> (priorizando datos históricos) y genera un informe estructurado en formato Excel (.xls) ordenado por clases.
+                </p>
+
+                <!-- 1. Selection of categories -->
+                <div id="xls-selection-panel">
+                    <label class="filter-label" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Seleccionar Categorías para Exportar</label>
+                    <div id="xls-categories-checklist" style="display: flex; flex-direction: column; gap: 0.5rem; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 10px; background: rgba(15, 23, 42, 0.4);">
+                        <!-- Will be populated by JS: e.g., Demográficos y sociales, Económicos, etc. -->
+                    </div>
+                    <div style="margin-top: 0.5rem; display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted);">
+                        <span id="xls-selected-count">0 indicadores seleccionados</span>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <span onclick="selectAllXlsCategories(true)" style="color: var(--accent-blue); cursor: pointer; font-weight: 500;">Marcar todos</span>
+                            <span>|</span>
+                            <span onclick="selectAllXlsCategories(false)" style="color: var(--text-muted); cursor: pointer; font-weight: 500;">Desmarcar todos</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 2. Progress panel (hidden by default) -->
+                <div id="xls-progress-panel" style="display: none; padding: 1rem; border: 1px solid var(--border-color); border-radius: 10px; background: rgba(15, 23, 42, 0.6);">
+                    <div style="display: flex; justify-content: space-between; font-size: 0.875rem; margin-bottom: 0.5rem; font-weight: 500;">
+                        <span id="xls-progress-status" style="color: var(--text-primary);">Preparando descarga...</span>
+                        <span id="xls-progress-percent" style="color: var(--accent-green); font-weight: 600;">0%</span>
+                    </div>
+                    <div class="progress-bar" style="width: 100%; height: 8px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden; margin-bottom: 0.75rem;">
+                        <div id="xls-progress-fill" class="progress-bar-fill" style="height: 100%; background: var(--accent-green); width: 0%; transition: width 0.1s ease;"></div>
+                    </div>
+                    <div id="xls-progress-detail" style="font-size: 0.75rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        Iniciando peticiones...
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-footer" style="padding: 1.25rem 1.5rem; border-top: 1px solid var(--border-color); background: rgba(11, 15, 25, 0.4); display: flex; justify-content: flex-end; gap: 0.75rem;">
+                <button class="btn-secondary" id="btn-xls-close" onclick="closeXlsExportModal()" style="padding: 0.5rem 1rem; border-radius: 6px; border: 1px solid var(--border-color); background: transparent; color: var(--text-secondary); font-weight: 500; cursor: pointer; transition: var(--transition-smooth);">Cerrar</button>
+                <button class="btn-secondary" id="btn-xls-cancel" onclick="cancelXlsExport()" style="display: none; padding: 0.5rem 1rem; border-radius: 6px; border: 1px solid var(--accent-red); background: transparent; color: var(--accent-red); font-weight: 500; cursor: pointer; transition: var(--transition-smooth);">Cancelar y Descargar Parcial</button>
+                <button class="btn-primary" id="btn-xls-start" onclick="startXlsExport()" style="background: linear-gradient(135deg, var(--accent-green) 0%, rgba(16,185,129,0.85) 100%); color: #0b0f19; font-weight: 600; padding: 0.5rem 1.25rem; border-radius: 6px; border: none; display: flex; align-items: center; gap: 0.5rem; cursor: pointer; transition: var(--transition-smooth);">
+                    <i class="fa-solid fa-play"></i> Iniciar Exportación
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Logic -->
+    <script src="app.js"></script>
+</body>
+</html>
