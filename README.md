@@ -1,6 +1,4 @@
-# Portal de Diagnóstico CEPALSTAT - Colombia vs. América Latina y el Caribe
-
-Este proyecto es una plataforma web interactiva diseñada en **HTML, CSS (Vanilla) y Javascript (ES6)** que consume directamente la API pública de **CEPALSTAT** para analizar y comparar indicadores demográficos, económicos, sociales y ambientales entre **Colombia** y el promedio regional de **América Latina y el Caribe (ALC)**.
+# Portal de Diagnóstico Este proyecto es una plataforma web interactiva diseñada en **HTML, CSS (Vanilla) y Javascript (ES6)** que consume directamente la API pública de **CEPALSTAT** para analizar y comparar indicadores demográficos, económicos, sociales y ambientales entre **Colombia** y el promedio regional de **América Latina y el Caribe (ALC)**.
 
 ---
 
@@ -52,6 +50,6 @@ Este proyecto es una plataforma web interactiva diseñada en **HTML, CSS (Vanill
 
 ---
 
-## 📄 Metadatos y Diagnóstico del Quindío
+## 📄 Metadatos y Diagnóstico 
 Para consultar los indicadores sugeridos y correspondientes a los 22 requerimientos y problemáticas de desarrollo regional del departamento del Quindío, revisa el archivo de mapeo provisto:
 *   [cepalstat_indicator_mapping.md](cepalstat_indicator_mapping.md)
