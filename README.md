@@ -1,8 +1,9 @@
-# Portal de Diagnóstico Este proyecto es una plataforma web interactiva diseñada en **HTML, CSS (Vanilla) y Javascript (ES6)** que consume directamente la API pública de **CEPALSTAT** para analizar y comparar indicadores demográficos, económicos, sociales y ambientales entre **Colombia** y el promedio regional de **América Latina y el Caribe (ALC)**.
+# Portal de Diagnóstico 
+##Este proyecto es una plataforma web interactiva diseñada en **HTML, CSS (Vanilla) y Javascript (ES6)** que consume directamente la API pública de **CEPALSTAT** para analizar y comparar indicadores demográficos, económicos, sociales y ambientales entre **Colombia** y el promedio regional de **América Latina y el Caribe (ALC)**.
 
 ---
 
-## 🚀 Características Principales
+### 🚀 Características Principales
 
 ### 1. Explorador General de Indicadores
 *   **Árbol Temático Interactivo**: Carga recursivamente la estructura de categorías de CEPALSTAT.
