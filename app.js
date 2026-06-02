@@ -134,6 +134,21 @@ async function fetchThematicTree() {
         if (appState.treeData && appState.treeData.children) {
             renderTree(appState.treeData.children, treeEl, []);
             appState.flatIndicators = flattenThematicTree(appState.treeData.children);
+            
+            // Re-initialize the export checklist if the user is currently on that section
+            if (appState.currentGlobalSection === 'exportar-datos') {
+                initExportarDatosSection();
+            }
+            
+            // Re-populate the report indicators list if the report modal is open
+            const reportModal = document.getElementById('report-modal');
+            if (reportModal && reportModal.style.display === 'flex') {
+                populateReportIndicatorsList();
+                const presetSelect = document.getElementById('report-preset-select');
+                if (presetSelect) {
+                    applyReportPreset(presetSelect.value);
+                }
+            }
         } else {
             treeEl.innerHTML = '<li class="tree-loading">El árbol temático está vacío</li>';
         }
@@ -2561,15 +2576,16 @@ function openReportModal() {
         modal.style.display = 'flex';
         // Initialize format to PDF
         setReportFormat('pdf');
-        // Default preset
+        // Default preset: default to structural-only if no indicator is active
+        const defaultPreset = appState.selectedIndicator ? 'active-only' : 'structural-only';
         const presetSelect = document.getElementById('report-preset-select');
-        if (presetSelect) presetSelect.value = 'active-only';
+        if (presetSelect) presetSelect.value = defaultPreset;
         
         // Populate indicators checklist
         populateReportIndicatorsList();
         
-        // Apply default preset (which checks the active indicator only)
-        applyReportPreset('active-only');
+        // Apply default preset
+        applyReportPreset(defaultPreset);
     }
 }
 
@@ -2611,7 +2627,7 @@ function applyReportPreset(preset) {
         structCheckboxes.forEach(cb => cb.checked = false);
         genCheckboxes.forEach(cb => {
             const indId = parseInt(cb.getAttribute('data-id'));
-            cb.checked = (appState.selectedIndicator && appState.selectedIndicator.id === indId);
+            cb.checked = !!(appState.selectedIndicator && appState.selectedIndicator.id === indId);
         });
     } else if (preset === 'structural-only') {
         structCheckboxes.forEach(cb => cb.checked = true);
@@ -2620,7 +2636,7 @@ function applyReportPreset(preset) {
         structCheckboxes.forEach(cb => cb.checked = true);
         genCheckboxes.forEach(cb => {
             const indId = parseInt(cb.getAttribute('data-id'));
-            cb.checked = (appState.selectedIndicator && appState.selectedIndicator.id === indId);
+            cb.checked = !!(appState.selectedIndicator && appState.selectedIndicator.id === indId);
         });
     }
 }
