@@ -4857,6 +4857,11 @@ function updateMassSelectedCount() {
                 
                 // User-visible debug info to isolate why count is 0
                 let debugInfo = [];
+                const allCbs = document.querySelectorAll('.mass-subcat-checkbox').length;
+                const checkedCbs = document.querySelectorAll('.mass-subcat-checkbox:checked').length;
+                debugInfo.push(`Total subcat checkboxes in DOM: ${allCbs}, Checked: ${checkedCbs}`);
+                debugInfo.push(`massState.selectedSubcategories size: ${massState.selectedSubcategories.size}`);
+                
                 if (massState.flatIndicators) {
                     const matchedFavs = massState.flatIndicators.filter(ind => isIndicatorFavorite(ind.id));
                     debugInfo.push(`Favoritos encontrados en flatIndicators: ${matchedFavs.length}`);
