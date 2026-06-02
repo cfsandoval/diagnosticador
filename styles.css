@@ -1397,12 +1397,134 @@ body {
     transform: scale(1.15);
 }
 
-.creator-indicator-row {
+.creator-indicator-row, .saved-indicator-item {
     transition: transform 0.2s ease, border-color 0.2s ease;
 }
 
-.creator-indicator-row:hover {
+.creator-indicator-row:hover, .saved-indicator-item:hover {
     border-color: rgba(59, 130, 246, 0.3) !important;
+}
+
+.btn-back {
+    transition: var(--transition-smooth);
+}
+
+.btn-back:hover {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border-color: var(--accent-blue) !important;
+    color: var(--accent-blue) !important;
+    transform: scale(1.05);
+}
+
+@media (max-width: 1024px) {
+    .creator-grid-layout {
+        grid-template-columns: 1fr !important;
+        gap: 1.5rem;
+    }
+}
+
+/* Consulta Inteligente CSS Styling */
+#sidebar-consulta-btn.active {
+    background: linear-gradient(90deg, rgba(168, 85, 247, 0.15) 0%, transparent 100%) !important;
+    border-left: 3px solid #a855f7 !important;
+    color: var(--text-primary) !important;
+    font-weight: 600 !important;
+}
+
+#sidebar-consulta-btn.active i {
+    color: #a855f7 !important;
+    opacity: 1 !important;
+}
+
+.consulta-autocomplete-item {
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    transition: background 0.2s ease;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.875rem;
+    text-align: left;
+    color: var(--text-primary);
+}
+
+.consulta-autocomplete-item:last-child {
+    border-bottom: none;
+}
+
+.consulta-autocomplete-item:hover {
+    background: rgba(168, 85, 247, 0.15);
+}
+
+.consulta-autocomplete-item .indicator-code {
+    font-size: 0.75rem;
+    color: #a855f7;
+    background: rgba(168, 85, 247, 0.1);
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-weight: 600;
+    margin-left: 0.75rem;
+    flex-shrink: 0;
+}
+
+.suggestion-prompt-card {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.75rem;
+    cursor: pointer;
+    transition: var(--transition-smooth);
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    text-align: left;
+}
+
+.suggestion-prompt-card:hover {
+    background: rgba(168, 85, 247, 0.08) !important;
+    border-color: rgba(168, 85, 247, 0.3) !important;
+    transform: translateY(-2px);
+}
+
+.chat-bubble-user {
+    display: flex;
+    gap: 0.75rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+    padding: 0.85rem 1rem;
+    border-radius: 12px 12px 0 12px;
+    line-height: 1.5;
+    align-self: flex-end;
+    max-width: 85%;
+    text-align: left;
+    margin-left: auto;
+}
+
+.chat-bubble-assistant {
+    display: flex;
+    gap: 0.75rem;
+    background: rgba(168, 85, 247, 0.05);
+    border: 1px solid rgba(168, 85, 247, 0.15);
+    padding: 0.85rem 1rem;
+    border-radius: 12px 12px 12px 0;
+    line-height: 1.5;
+    max-width: 85%;
+    text-align: left;
+}
+
+#consulta-chat-container {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(168, 85, 247, 0.3) transparent;
+}
+
+#consulta-chat-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+#consulta-chat-container::-webkit-scrollbar-thumb {
+    background-color: rgba(168, 85, 247, 0.3);
+    border-radius: 3px;
 }
 
 

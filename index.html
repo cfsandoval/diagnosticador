@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Dashboard interactivo para el análisis diagnóstico comparativo de indicadores socioeconómicos y demográficos entre Colombia y América Latina utilizando la API de la CEPAL.">
+    <meta name="description" content="Dashboard interactivo para el análisis diagnóstico comparativo de indicadores socioeconómicos y demográficos entre Colombia y América Latina.">
     <title>Portal de Diagnóstico</title>
     
     <!-- Google Fonts -->
@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <!-- Stylesheet -->
-    <link rel="stylesheet" href="styles.css?v=1.0.2">
+    <link rel="stylesheet" href="styles.css?v=1.2.0">
     
     <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -22,7 +22,7 @@
 <body>
     <!-- Top Global Navbar -->
     <header class="global-navbar">
-        <div class="brand">
+        <div class="brand" onclick="goHome()" style="cursor: pointer; transition: var(--transition-smooth);" title="Ir a la pantalla de inicio">
             <i class="fa-solid fa-square-poll-vertical brand-icon" style="font-size: 1.5rem; background: linear-gradient(135deg, var(--color-colombia) 0%, var(--color-alc) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"></i>
             <span class="brand-text">Portal de Diagnóstico</span>
         </div>
@@ -37,6 +37,16 @@
             </button>
         </div>
     </header>
+    <div class="version-info" style="text-align:center; font-size:0.85rem; color:var(--text-secondary); margin-top:0.5rem;">
+        Versión: <span id="app-version">v1.2.0</span> • Última edición: <span id="last-modified"></span>
+    </div>
+    <script>
+        // Populate version and last-modified date
+        document.getElementById('app-version').textContent = 'v1.2.0';
+        const lastMod = new Date(document.lastModified);
+        const options = { year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit', hour12:false };
+        document.getElementById('last-modified').textContent = lastMod.toLocaleDateString('es-CO', options);
+    </script>
 
     <div class="app-container" id="app">
         <!-- Sidebar Navigation -->
@@ -60,7 +70,7 @@
                         </li>
                         <li class="structures-list-item" id="sidebar-tendencias-btn" onclick="selectTendenciasSection()">
                             <i class="fa-solid fa-arrow-trend-up"></i>
-                            <span>Tendencias CEPAL 2025</span>
+                            <span>Tendencias 2025</span>
                         </li>
                         <li class="structures-list-item" id="sidebar-exportar-datos-btn" onclick="selectExportarDatosSection()">
                             <i class="fa-solid fa-file-export"></i>
@@ -70,41 +80,37 @@
                             <i class="fa-solid fa-calculator"></i>
                             <span>Creador de Indicadores</span>
                         </li>
+                        <li class="structures-list-item" id="sidebar-consulta-btn" onclick="selectConsultaSection()">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i>
+                            <span>Consulta Inteligente</span>
+                        </li>
                     </ul>
-                </div>
+<div class="sidebar-section explorer-section" style="margin-top:1rem;">
+    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; padding: 0 0.5rem;">
+        <i class="fa-solid fa-compass" style="color: var(--accent-blue); font-size: 0.875rem;"></i>
+        <span class="metadata-subtitle" style="font-size:0.75rem; letter-spacing:0.5px; font-weight:600; text-transform:uppercase;">Explorador de Indicadores</span>
+    </div>
+    <div class="search-container" style="margin-bottom:0.75rem; padding: 0 0.5rem;">
+        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+        <input type="text" id="indicator-search" class="search-input" placeholder="Buscar 2,000+ indicadores..." autocomplete="off">
+    </div>
+    <div class="tree-container" id="tree-container" style="flex:1; overflow-y:auto; min-height:250px; padding: 0 0.5rem;">
+        <div class="tree-loading" id="tree-loading">
+            <div class="spinner"></div>
+            <span>Cargando árbol temático...</span>
+        </div>
+        <ul class="tree-list" id="thematic-tree"></ul>
+    </div>
+</div>
 
-                <!-- SECTION 2: EXPLORADOR GENERAL (ARBOL Y BUSQUEDA) -->
-                <div style="border-top: 1px solid var(--border-color); padding-top: 1.5rem; display: flex; flex-direction: column; flex: 1; min-height: 0;">
-                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; padding: 0 0.5rem;">
-                        <i class="fa-solid fa-compass" style="color: var(--accent-blue); font-size: 0.875rem;"></i>
-                        <span class="metadata-subtitle" style="font-size: 0.75rem; letter-spacing: 0.5px; font-weight: 600; text-transform: uppercase;">Explorador de Indicadores</span>
-                    </div>
-                    
-                    <div class="search-container" style="margin-bottom: 0.75rem;">
-                        <i class="fa-solid fa-magnifying-glass search-icon"></i>
-                        <input type="text" id="indicator-search" class="search-input" placeholder="Buscar 2,000+ indicadores..." autocomplete="off">
-                    </div>
-
-                    <div class="tree-container" id="tree-container" style="flex: 1; overflow-y: auto; min-height: 250px;">
-                        <div class="tree-loading" id="tree-loading">
-                            <div class="spinner"></div>
-                            <span>Cargando árbol temático...</span>
-                        </div>
-                        <ul class="tree-list" id="thematic-tree">
-                            <!-- Dynamic tree nodes will be inserted here -->
-                        </ul>
-                    </div>
-                </div>
-
-                <!-- SECTION 1: ESTRUCTURA DEMOGRÁFICA (PIRÁMIDES) -->
-                <div style="border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
-                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; padding: 0 0.5rem;">
-                        <i class="fa-solid fa-users-line" style="color: var(--color-alc); font-size: 0.875rem;"></i>
-                        <span class="metadata-subtitle" style="font-size: 0.75rem; letter-spacing: 0.5px; font-weight: 600; text-transform: uppercase;">Estructuras de Edad y Sexo</span>
-                    </div>
-                    <ul class="tree-list" id="structures-indicator-list">
-                        <!-- Grouped indicators will be populated here -->
-                    </ul>
+<div class="sidebar-section structures-section" style="margin-top:1rem;">
+    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; padding: 0 0.5rem;">
+        <i class="fa-solid fa-users-line" style="color: var(--color-alc); font-size: 0.875rem;"></i>
+        <span class="metadata-subtitle" style="font-size: 0.75rem; letter-spacing: 0.5px; font-weight: 600; text-transform: uppercase;">Estructuras de Edad y Sexo</span>
+    </div>
+    <ul class="tree-list" id="structures-indicator-list" style="padding: 0 0.5rem;"></ul>
+</div>
+       
                 </div>
             </div>
         </aside>
@@ -119,9 +125,9 @@
                     <div class="empty-icon-wrapper">
                         <i class="fa-solid fa-chart-line"></i>
                     </div>
-                    <h1 class="empty-title">Explorador General de Series CEPAL</h1>
+                    <h1 class="empty-title">Explorador General de Indicadores</h1>
                     <p class="empty-description">
-                        Consulta y compara de forma directa datos históricos entre **Colombia** y el promedio de **América Latina y el Caribe** a través de la base de datos oficial de la CEPAL.
+                        Consulta y compara de forma directa datos históricos entre **Colombia** y el promedio de **América Latina y el Caribe** a través de la base de datos regional oficial.
                     </p>
                     <div class="empty-steps">
                         <div class="empty-step">
@@ -143,13 +149,18 @@
                 <div id="dashboard-container" style="display: none;">
                     <!-- Dashboard Header -->
                     <header class="dashboard-header">
-                        <div class="dashboard-title-area">
+                        <div style="display: flex; align-items: center; gap: 1.25rem;">
+                            <button type="button" class="btn-back" onclick="history.back()" style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer; width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: var(--transition-smooth); font-size: 0.95rem; flex-shrink: 0;" title="Volver atrás">
+                                <i class="fa-solid fa-arrow-left"></i>
+                            </button>
+                            <div class="dashboard-title-area">
                             <span class="indicator-subtitle" id="dashboard-indicator-area">Demográficos y Sociales / Demográficos / Población</span>
                             <h1 class="indicator-title" id="dashboard-indicator-name">Población total, según sexo</h1>
                         </div>
+                        </div>
                         <div class="api-badge">
                             <span class="dot"></span>
-                            <span>API CEPAL</span>
+                            <span>API Conectada</span>
                         </div>
                     </header>
 
@@ -172,7 +183,7 @@
                             <!-- LAC Value -->
                             <div class="card card-alc">
                                 <div class="kpi-title alc">
-                                    <span>América Latina y el Caribe</span>
+                                    <span id="kpi-alc-title">América Latina y el Caribe</span>
                                     <i class="fa-solid fa-globe"></i>
                                 </div>
                                 <div class="kpi-value" id="kpi-alc-val">-</div>
@@ -220,8 +231,18 @@
                                                     <i class="fa-solid fa-chart-bar"></i> Barras
                                                 </button>
                                             </div>
+                                            <div class="region-select" style="margin-left:0.75rem; display:flex; align-items:center; gap:0.5rem;">
+                                                <label for="region-comparison" style="font-size:0.75rem; color:var(--text-muted); white-space:nowrap;">
+                                                    <i class="fa-solid fa-earth-americas" style="margin-right:0.25rem;"></i>Comparativa:
+                                                </label>
+                                                <select id="region-comparison" onchange="handleRegionChange()" style="padding:0.3rem 0.6rem; border-radius:6px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-primary); font-size:0.8rem; cursor:pointer;">
+                                                    <option value="ALC">América Latina y el Caribe</option>
+                                                    <option value="LAT">América Latina (promedio simple)</option>
+                                                    <option value="LATO">América Latina</option>
+                                                    <option value="COL" style="display:none;">Colombia</option> <!-- keep parity with JS -->
+                                                </select>
+                                            </div>
                                         </div>
-                                    </div>
                                     <div class="chart-wrapper">
                                         <canvas id="indicator-chart"></canvas>
                                     </div>
@@ -262,19 +283,47 @@
                         <section class="card metadata-card">
                             <h2 class="filter-section-title">
                                 <i class="fa-solid fa-info-circle"></i>
-                                Ficha Técnica y Metadatos
+                                Ficha Técnica y Metadatos Oficiales (API CEPAL)
                             </h2>
                             <div class="metadata-grid">
-                                <div class="metadata-section">
-                                    <span class="metadata-subtitle">Definición / Unidad de Medida</span>
+                                <div class="metadata-section" style="grid-column: 1 / -1;">
+                                    <span class="metadata-subtitle"><i class="fa-solid fa-align-left" style="margin-right: 0.35rem; color: var(--accent-blue);"></i>Definición Oficial</span>
                                     <div class="metadata-content" id="meta-definition">No disponible.</div>
                                 </div>
                                 <div class="metadata-section">
-                                    <span class="metadata-subtitle">Fuentes Originales</span>
+                                    <span class="metadata-subtitle"><i class="fa-solid fa-ruler" style="margin-right: 0.35rem; color: var(--accent-blue);"></i>Unidad de Medida</span>
+                                    <div class="metadata-content" id="meta-unit">No disponible.</div>
+                                </div>
+                                <div class="metadata-section">
+                                    <span class="metadata-subtitle"><i class="fa-solid fa-tags" style="margin-right: 0.35rem; color: var(--accent-blue);"></i>Tema / Área Temática</span>
+                                    <div class="metadata-content" id="meta-theme-area">No disponible.</div>
+                                </div>
+                                <div class="metadata-section">
+                                    <span class="metadata-subtitle"><i class="fa-solid fa-calendar-check" style="margin-right: 0.35rem; color: var(--accent-blue);"></i>Última Actualización</span>
+                                    <div class="metadata-content" id="meta-updated">No disponible.</div>
+                                </div>
+                                <div class="metadata-section" id="meta-methodology-section" style="grid-column: 1 / -1;">
+                                    <span class="metadata-subtitle"><i class="fa-solid fa-calculator" style="margin-right: 0.35rem; color: var(--accent-blue);"></i>Metodología de Cálculo</span>
+                                    <div class="metadata-content" id="meta-methodology">No disponible.</div>
+                                </div>
+                                <div class="metadata-section" id="meta-features-section">
+                                    <span class="metadata-subtitle"><i class="fa-solid fa-database" style="margin-right: 0.35rem; color: var(--accent-blue);"></i>Características de los Datos</span>
+                                    <div class="metadata-content" id="meta-features">No disponible.</div>
+                                </div>
+                                <div class="metadata-section" id="meta-note-section">
+                                    <span class="metadata-subtitle"><i class="fa-solid fa-note-sticky" style="margin-right: 0.35rem; color: var(--accent-blue);"></i>Nota Especial</span>
+                                    <div class="metadata-content" id="meta-note">No disponible.</div>
+                                </div>
+                                <div class="metadata-section" id="meta-comments-section" style="grid-column: 1 / -1;">
+                                    <span class="metadata-subtitle"><i class="fa-solid fa-comments" style="margin-right: 0.35rem; color: var(--accent-blue);"></i>Observaciones y Comentarios</span>
+                                    <div class="metadata-content" id="meta-comments">No disponible.</div>
+                                </div>
+                                <div class="metadata-section">
+                                    <span class="metadata-subtitle"><i class="fa-solid fa-book-open" style="margin-right: 0.35rem; color: var(--accent-blue);"></i>Fuentes Originales</span>
                                     <div class="metadata-content" id="meta-sources">No disponible.</div>
                                 </div>
                                 <div class="metadata-section" id="notes-section">
-                                    <span class="metadata-subtitle">Notas al Pie (CEPAL)</span>
+                                    <span class="metadata-subtitle"><i class="fa-solid fa-asterisk" style="margin-right: 0.35rem; color: var(--accent-blue);"></i>Notas al Pie</span>
                                     <div class="metadata-content" id="meta-footnotes">No disponible.</div>
                                 </div>
                             </div>
@@ -295,7 +344,7 @@
                                         <tr>
                                             <th class="col-year">Año</th>
                                             <th class="col-colombia">Colombia</th>
-                                            <th class="col-alc">América Latina y el Caribe</th>
+                                            <th class="col-alc" id="table-alc-header">América Latina y el Caribe</th>
                                             <th class="col-gap">Brecha Absoluta</th>
                                             <th class="col-pct">Brecha %</th>
                                         </tr>
@@ -314,9 +363,14 @@
             <div id="structures-section" style="display: none; height: 100%;">
                 <!-- Dashboard Header -->
                 <header class="dashboard-header">
-                    <div class="dashboard-title-area">
+                    <div style="display: flex; align-items: center; gap: 1.25rem;">
+                        <button type="button" class="btn-back" onclick="history.back()" style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer; width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: var(--transition-smooth); font-size: 0.95rem; flex-shrink: 0;" title="Volver atrás">
+                            <i class="fa-solid fa-arrow-left"></i>
+                        </button>
+                        <div class="dashboard-title-area">
                         <span class="indicator-subtitle">Estructura Demográfica y Social</span>
                         <h1 class="indicator-title" id="pyramid-indicator-name">Población total por grupos de edad</h1>
+                    </div>
                     </div>
                     <div class="api-badge" style="background: rgba(168, 85, 247, 0.1); border-color: rgba(168, 85, 247, 0.2);">
                         <span class="dot" style="background-color: var(--color-alc); box-shadow: 0 0 8px var(--color-alc);"></span>
@@ -389,9 +443,14 @@
             <div id="brechas-section" style="display: none; height: 100%;">
                 <!-- Dashboard Header -->
                 <header class="dashboard-header">
-                    <div class="dashboard-title-area">
+                    <div style="display: flex; align-items: center; gap: 1.25rem;">
+                        <button type="button" class="btn-back" onclick="history.back()" style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer; width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: var(--transition-smooth); font-size: 0.95rem; flex-shrink: 0;" title="Volver atrás">
+                            <i class="fa-solid fa-arrow-left"></i>
+                        </button>
+                        <div class="dashboard-title-area">
                         <span class="indicator-subtitle">Diagnóstico Comparativo Nacional</span>
                         <h1 class="indicator-title">Resumen de Brechas Críticas y Desviación Estadística</h1>
+                    </div>
                     </div>
                     <div class="api-badge" style="background: rgba(255, 215, 0, 0.1); border-color: rgba(255, 215, 0, 0.2);">
                         <span class="dot" style="background-color: var(--color-colombia); box-shadow: 0 0 8px var(--color-colombia);"></span>
@@ -451,9 +510,14 @@
             <!-- SECTION 4: METODOLOGÍA ANALÍTICA -->
             <div id="metodologia-section" style="display: none; height: 100%;">
                 <header class="dashboard-header">
-                    <div class="dashboard-title-area">
+                    <div style="display: flex; align-items: center; gap: 1.25rem;">
+                        <button type="button" class="btn-back" onclick="history.back()" style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer; width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: var(--transition-smooth); font-size: 0.95rem; flex-shrink: 0;" title="Volver atrás">
+                            <i class="fa-solid fa-arrow-left"></i>
+                        </button>
+                        <div class="dashboard-title-area">
                         <span class="indicator-subtitle">Algoritmos de Diagnóstico Local</span>
                         <h1 class="indicator-title">Metodología y Fórmulas del Análisis Inteligente</h1>
+                    </div>
                     </div>
                     <div class="api-badge" style="background: rgba(59, 130, 246, 0.1); border-color: rgba(59, 130, 246, 0.2);">
                         <span class="dot" style="background-color: var(--accent-blue); box-shadow: 0 0 8px var(--accent-blue);"></span>
@@ -619,7 +683,7 @@
                                 <div style="display: flex; gap: 1rem; align-items: flex-start;">
                                     <div style="background: var(--accent-blue); color: #0b0f19; font-weight: 700; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 0.8rem; margin-top: 0.15rem;">1</div>
                                     <div>
-                                        <strong style="color: var(--text-primary);">Consumo de API</strong>: Recupera los microdatos multidimensionales de la CEPAL.
+                                        <strong style="color: var(--text-primary);">Consumo de API</strong>: Recupera los microdatos multidimensionales de la base regional.
                                     </div>
                                 </div>
                                 <div style="display: flex; gap: 1rem; align-items: flex-start; border-top: 1px solid rgba(255,255,255,0.04); padding-top: 0.75rem;">
@@ -649,9 +713,14 @@
             <!-- SECTION 5: TENDENCIAS CEPAL 2025 -->
             <div id="tendencias-section" style="display: none; height: 100%;">
                 <header class="dashboard-header">
-                    <div class="dashboard-title-area">
-                        <span class="indicator-subtitle">Análisis de Informes de la CEPAL (2024-2025)</span>
+                    <div style="display: flex; align-items: center; gap: 1.25rem;">
+                        <button type="button" class="btn-back" onclick="history.back()" style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer; width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: var(--transition-smooth); font-size: 0.95rem; flex-shrink: 0;" title="Volver atrás">
+                            <i class="fa-solid fa-arrow-left"></i>
+                        </button>
+                        <div class="dashboard-title-area">
+                        <span class="indicator-subtitle">Análisis de Informes Regionales (2024-2025)</span>
                         <h1 class="indicator-title">Tendencias de Desarrollo en América Latina y Colombia</h1>
+                    </div>
                     </div>
                     <div class="api-badge" style="background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.2);">
                         <span class="dot" style="background-color: var(--accent-green); box-shadow: 0 0 8px var(--accent-green);"></span>
@@ -662,7 +731,7 @@
                 <div class="dashboard-body" style="padding-bottom: 2rem;">
                     <!-- Report selector tabs -->
                     <div class="card" style="margin-bottom: 1.5rem; padding: 1.25rem;">
-                        <label class="filter-label" style="display: block; margin-bottom: 0.75rem; font-weight: 600;">Seleccionar Informe de la CEPAL:</label>
+                        <label class="filter-label" style="display: block; margin-bottom: 0.75rem; font-weight: 600;">Seleccionar Informe:</label>
                         <div class="btn-group" id="tendencias-report-tabs" style="display: flex; flex-wrap: wrap; width: 100%; background: rgba(15, 23, 42, 0.5); border: 1px solid var(--border-color); border-radius: 10px; padding: 4px; gap: 4px;">
                             <!-- Tabs populated by JS -->
                         </div>
@@ -678,9 +747,14 @@
             <!-- SECTION 6: EXPORTAR DATOS BASE Y TABLA COMPLETA -->
             <div id="exportar-datos-section" style="display: none; height: 100%;">
                 <header class="dashboard-header">
-                    <div class="dashboard-title-area">
+                    <div style="display: flex; align-items: center; gap: 1.25rem;">
+                        <button type="button" class="btn-back" onclick="history.back()" style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer; width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: var(--transition-smooth); font-size: 0.95rem; flex-shrink: 0;" title="Volver atrás">
+                            <i class="fa-solid fa-arrow-left"></i>
+                        </button>
+                        <div class="dashboard-title-area">
                         <span class="indicator-subtitle">Exportación y Consulta Masiva de Datos</span>
                         <h1 class="indicator-title">Exportador de Datos Base</h1>
+                    </div>
                     </div>
                     <div class="api-badge" style="background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.2);">
                         <span class="dot" style="background-color: var(--accent-green); box-shadow: 0 0 8px var(--accent-green);"></span>
@@ -695,6 +769,17 @@
                         <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1.25rem; line-height: 1.5;">
                             Selecciona las categorías temáticas que deseas incluir. El sistema consultará el último dato histórico coincidente entre <strong>Colombia</strong> y <strong>América Latina y el Caribe</strong> para cada indicador.
                         </p>
+
+                        <!-- Filter Options (e.g., Only Saved) -->
+                        <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.25rem; padding: 0.75rem 1rem; background: rgba(59, 130, 246, 0.05); border: 1px solid rgba(59, 130, 246, 0.15); border-radius: 8px;">
+                            <label style="display: flex; align-items: center; gap: 0.6rem; font-size: 0.875rem; color: var(--text-primary); cursor: pointer; margin-bottom: 0; user-select: none;">
+                                <input type="checkbox" id="mass-only-favorites" onchange="updateMassSelectedCount()" style="width: 1rem; height: 1rem; cursor: pointer; accent-color: var(--accent-blue);">
+                                <span><i class="fa-solid fa-bookmark" style="color: var(--color-colombia); margin-right: 0.25rem;"></i> Exportar sólo indicadores guardados (favoritos)</span>
+                            </label>
+                            <div id="mass-favorites-warning" style="display: none; font-size: 0.78rem; color: var(--color-colombia); margin-top: 0.25rem; font-weight: 500;">
+                                <i class="fa-solid fa-triangle-exclamation"></i> No tienes ningún indicador guardado. Agrega favoritos en el explorador de la izquierda antes de exportar.
+                            </div>
+                        </div>
 
                         <!-- Checklist container -->
                         <div id="mass-categories-checklist" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0.75rem; padding: 1rem; border: 1px solid var(--border-color); border-radius: 10px; background: rgba(15, 23, 42, 0.4); max-height: 250px; overflow-y: auto; margin-bottom: 1.25rem;">
@@ -747,7 +832,6 @@
                             <h2 class="chart-title"><i class="fa-solid fa-list-check" style="color: var(--accent-blue); margin-right: 0.5rem;"></i> Resultados de la Consulta Masiva</h2>
                             
                             <div style="display: flex; gap: 0.75rem; align-items: center;">
-                                <!-- Search Input inside results -->
                                 <div class="search-container" style="width: 250px;">
                                     <i class="fa-solid fa-magnifying-glass search-icon" style="font-size: 0.8rem;"></i>
                                     <input type="text" id="mass-search-input" class="search-input" placeholder="Filtrar resultados..." oninput="filterMassTable(this.value)" style="padding: 0.5rem 1rem 0.5rem 2.2rem; font-size: 0.8rem; border-radius: 8px;">
@@ -779,15 +863,22 @@
                                     <!-- Populated dynamically by JS -->
                                 </tbody>
                             </table>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <!-- SECTION 7: CREADOR DE INDICADORES SINTÉTICOS -->
             <div id="creador-section" style="display: none; height: 100%;">
                 <header class="dashboard-header">
-                    <div class="dashboard-title-area">
+                    <div style="display: flex; align-items: center; gap: 1.25rem;">
+                        <button type="button" class="btn-back" onclick="history.back()" style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer; width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: var(--transition-smooth); font-size: 0.95rem; flex-shrink: 0;" title="Volver atrás">
+                            <i class="fa-solid fa-arrow-left"></i>
+                        </button>
+                        <div class="dashboard-title-area">
                         <span class="indicator-subtitle">Cálculo y Modelado Personalizado de Series</span>
                         <h1 class="indicator-title">Creador de Indicadores Sintéticos</h1>
+                    </div>
                     </div>
                     <div class="api-badge" style="background: rgba(59, 130, 246, 0.1); border-color: rgba(59, 130, 246, 0.2);">
                         <span class="dot" style="background-color: var(--accent-blue); box-shadow: 0 0 8px var(--accent-blue);"></span>
@@ -796,81 +887,117 @@
                 </header>
 
                 <div class="dashboard-body" style="padding-bottom: 2rem;">
-                    <!-- Configuration Form Card -->
-                    <div class="card" style="margin-bottom: 1.5rem;">
-                        <h2 class="chart-title" style="margin-bottom: 1rem;"><i class="fa-solid fa-gears" style="color: var(--accent-blue); margin-right: 0.5rem;"></i> Configuración del Indicador Sintético</h2>
-                        <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1.5rem; line-height: 1.5;">
-                            Ingresa dos o más códigos oficiales de la CEPAL y selecciona la operación matemática para combinarlos. El sistema consultará la API de la CEPAL y construirá las series temporales alineadas para Colombia y América Latina y el Caribe.
-                        </p>
+                    <!-- Two Column Layout for Creator & Database -->
+                    <div class="creator-grid-layout" style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; align-items: start;">
+                        <!-- Configuration Form Card -->
+                        <div class="card" style="margin-bottom: 0;">
+                            <h2 class="chart-title" style="margin-bottom: 1rem;"><i class="fa-solid fa-gears" style="color: var(--accent-blue); margin-right: 0.5rem;"></i> Configuración del Indicador Sintético</h2>
+                            <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1.5rem; line-height: 1.5;">
+                                Ingresa dos o más códigos oficiales y selecciona la operación matemática para combinarlos. El sistema consultará la API y construirá las series temporales alineadas para Colombia y América Latina y el Caribe.
+                            </p>
 
-                        <!-- Dynamic list of indicators -->
-                        <div id="creator-indicators-list" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
-                            <!-- Indicator rows will be injected here dynamically by JS -->
+                            <!-- Dynamic list of indicators -->
+                            <div id="creator-indicators-list" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+                                <!-- Indicator rows will be injected here dynamically by JS -->
+                            </div>
+
+                            <!-- Button to add more indicators -->
+                            <div style="margin-bottom: 1.5rem;">
+                                <button type="button" class="btn-primary" onclick="addIndicatorInputRow()" style="background: rgba(255, 255, 255, 0.05); border: 1px dashed var(--border-color); color: var(--text-primary); padding: 0.6rem 1rem; border-radius: 8px; display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; transition: var(--transition-smooth);">
+                                    <i class="fa-solid fa-plus" style="color: var(--accent-blue);"></i>
+                                    <span>Agregar otro indicador</span>
+                                </button>
+                            </div>
+
+                            <!-- Scaling and Metadata Options -->
+                            <div class="creator-form-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                                <!-- Operator Selector -->
+                                <div class="form-group" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                                    <label class="filter-label" style="font-weight: 600; margin-bottom: 0;">Operación Matemática</label>
+                                    <select class="select-control" id="creator-operator" style="padding: 0.6rem 2.5rem 0.6rem 1rem; border-radius: 8px; font-weight: 600;">
+                                        <option value="add">Suma (+)</option>
+                                        <option value="subtract">Resta (-)</option>
+                                        <option value="multiply">Multiplicación (×)</option>
+                                        <option value="divide">División (÷)</option>
+                                    </select>
+                                </div>
+
+                                <!-- Scale Factor -->
+                                <div class="form-group" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                                    <label class="filter-label" style="font-weight: 600; margin-bottom: 0;">Multiplicador (Escala)</label>
+                                    <select class="select-control" id="creator-scale" style="padding: 0.6rem 2.5rem 0.6rem 1rem; border-radius: 8px;">
+                                        <option value="1">1 (Sin cambio)</option>
+                                        <option value="100">100 (Para obtener %)</option>
+                                        <option value="1000">1,000</option>
+                                        <option value="100000">100,000</option>
+                                    </select>
+                                </div>
+
+                                <!-- Custom Name -->
+                                <div class="form-group" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                                    <label class="filter-label" style="font-weight: 600; margin-bottom: 0;">Nombre del Indicador Sintético</label>
+                                    <input type="text" id="creator-custom-name" class="search-input" placeholder="Ej: Pobreza Relativa Sintética" style="padding: 0.6rem 1rem; border-radius: 8px;">
+                                </div>
+
+                                <!-- Custom Unit -->
+                                <div class="form-group" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                                    <label class="filter-label" style="font-weight: 600; margin-bottom: 0;">Unidad de Medida</label>
+                                    <input type="text" id="creator-custom-unit" class="search-input" placeholder="Ej: % o USD/hab" style="padding: 0.6rem 1rem; border-radius: 8px;">
+                                </div>
+                            </div>
+
+                            <!-- Action Button -->
+                            <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem;">
+                                <button class="btn-primary" id="btn-creator-generate" onclick="generateSyntheticIndicator()" style="background: linear-gradient(135deg, var(--accent-blue) 0%, rgba(59,130,246,0.85) 100%); color: #0b0f19; font-weight: 600; padding: 0.75rem 1.75rem; border-radius: 8px; border: none; display: flex; align-items: center; gap: 0.5rem; cursor: pointer; transition: var(--transition-smooth);">
+                                    <i class="fa-solid fa-play"></i>
+                                    <span>Generar Indicador Sintético</span>
+                                </button>
+                            </div>
                         </div>
 
-                        <!-- Button to add more indicators -->
-                        <div style="margin-bottom: 1.5rem;">
-                            <button type="button" class="btn-primary" onclick="addIndicatorInputRow()" style="background: rgba(255, 255, 255, 0.05); border: 1px dashed var(--border-color); color: var(--text-primary); padding: 0.6rem 1rem; border-radius: 8px; display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; transition: var(--transition-smooth);">
-                                <i class="fa-solid fa-plus" style="color: var(--accent-blue);"></i>
-                                <span>Agregar otro indicador</span>
-                            </button>
-                        </div>
-
-                        <!-- Scaling and Metadata Options -->
-                        <div class="creator-form-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
-                            <!-- Operator Selector -->
-                            <div class="form-group" style="display: flex; flex-direction: column; gap: 0.5rem;">
-                                <label class="filter-label" style="font-weight: 600; margin-bottom: 0;">Operación Matemática</label>
-                                <select class="select-control" id="creator-operator" style="padding: 0.6rem 2.5rem 0.6rem 1rem; border-radius: 8px; font-weight: 600;">
-                                    <option value="add">Suma (+)</option>
-                                    <option value="subtract">Resta (-)</option>
-                                    <option value="multiply">Multiplicación (×)</option>
-                                    <option value="divide">División (÷)</option>
-                                </select>
+                        <!-- Saved Indicators Card -->
+                        <div class="card" style="margin-bottom: 0; display: flex; flex-direction: column; height: 100%; min-height: 480px; max-height: 495px;">
+                            <h2 class="chart-title" style="margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;"><i class="fa-solid fa-database" style="color: var(--accent-blue);"></i> <span>Indicadores Guardados</span></h2>
+                            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1rem; line-height: 1.4;">
+                                Combinaciones sintéticas almacenadas localmente. Haz clic para cargar o pulsa la papelera para eliminar.
+                            </p>
+                            <div id="creator-saved-list" style="display: flex; flex-direction: column; gap: 0.75rem; flex: 1; overflow-y: auto; padding-right: 0.25rem;">
+                                <!-- Will be populated dynamically by JS -->
+                                <div style="text-align: center; color: var(--text-muted); font-size: 0.85rem; padding: 2.5rem 0;">
+                                    <i class="fa-solid fa-folder-open" style="font-size: 1.5rem; margin-bottom: 0.5rem; display: block; opacity: 0.5;"></i>
+                                    No hay indicadores guardados.
+                                </div>
                             </div>
-
-                            <!-- Scale Factor -->
-                            <div class="form-group" style="display: flex; flex-direction: column; gap: 0.5rem;">
-                                <label class="filter-label" style="font-weight: 600; margin-bottom: 0;">Multiplicador (Escala)</label>
-                                <select class="select-control" id="creator-scale" style="padding: 0.6rem 2.5rem 0.6rem 1rem; border-radius: 8px;">
-                                    <option value="1">1 (Sin cambio)</option>
-                                    <option value="100">100 (Para obtener %)</option>
-                                    <option value="1000">1,000</option>
-                                    <option value="100000">100,000</option>
-                                </select>
-                            </div>
-
-                            <!-- Custom Name -->
-                            <div class="form-group" style="display: flex; flex-direction: column; gap: 0.5rem;">
-                                <label class="filter-label" style="font-weight: 600; margin-bottom: 0;">Nombre del Indicador Sintético</label>
-                                <input type="text" id="creator-custom-name" class="search-input" placeholder="Ej: Pobreza Relativa Sintética" style="padding: 0.6rem 1rem; border-radius: 8px;">
-                            </div>
-
-                            <!-- Custom Unit -->
-                            <div class="form-group" style="display: flex; flex-direction: column; gap: 0.5rem;">
-                                <label class="filter-label" style="font-weight: 600; margin-bottom: 0;">Unidad de Medida</label>
-                                <input type="text" id="creator-custom-unit" class="search-input" placeholder="Ej: % o USD/hab" style="padding: 0.6rem 1rem; border-radius: 8px;">
-                            </div>
-                        </div>
-
-                        <!-- Action Button -->
-                        <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem;">
-                            <button class="btn-primary" id="btn-creator-generate" onclick="generateSyntheticIndicator()" style="background: linear-gradient(135deg, var(--accent-blue) 0%, rgba(59,130,246,0.85) 100%); color: #0b0f19; font-weight: 600; padding: 0.75rem 1.75rem; border-radius: 8px; border: none; display: flex; align-items: center; gap: 0.5rem; cursor: pointer; transition: var(--transition-smooth);">
-                                <i class="fa-solid fa-play"></i>
-                                <span>Generar Indicador Sintético</span>
-                            </button>
                         </div>
                     </div>
 
                     <!-- Loader Panel (hidden by default) -->
                     <div id="creator-progress-panel" style="display: none; padding: 1.5rem; border: 1px solid var(--border-color); border-radius: 12px; background: rgba(15, 23, 42, 0.6); margin-bottom: 1.5rem; text-align: center; flex-direction: column; align-items: center; gap: 0.75rem;">
                         <div class="spinner" style="border-top-color: var(--accent-blue);"></div>
-                        <span id="creator-progress-status" style="color: var(--text-primary); font-weight: 500; font-size: 0.9rem;">Consultando la API de la CEPAL...</span>
+                        <span id="creator-progress-status" style="color: var(--text-primary); font-weight: 500; font-size: 0.9rem;">Consultando la API...</span>
                     </div>
 
                     <!-- Output Results Panel (hidden by default) -->
                     <div id="creator-results-area" style="display: none; flex-direction: column; gap: 1.5rem;">
                         
+                        <!-- Formula Summary Card -->
+                        <div class="card" id="creator-formula-card" style="margin-bottom: 0; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.25rem 1.5rem; transition: var(--transition-smooth);">
+                            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; width: 100%;">
+                                <div style="flex: 1; min-width: 280px; text-align: left;">
+                                    <span class="metadata-subtitle" style="font-size: 0.72rem; letter-spacing: 0.75px; font-weight: 700; text-transform: uppercase; color: var(--accent-blue); display: block; margin-bottom: 0.25rem;">Indicador Sintético Generado</span>
+                                    <h2 class="chart-title" id="creator-result-title" style="margin-top: 0; margin-bottom: 0.75rem; font-size: 1.25rem; font-family: var(--font-heading); font-weight: 700; color: var(--text-primary);">Nombre del Indicador</h2>
+                                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; font-size: 0.85rem; color: var(--text-secondary); line-height: 1.4;">
+                                        <i class="fa-solid fa-square-root-variable" style="color: var(--accent-blue); font-size: 0.95rem;"></i>
+                                        <span><strong>Fórmula:</strong></span>
+                                        <span id="creator-result-formula" style="font-family: monospace; background: rgba(15, 23, 42, 0.5); padding: 0.35rem 0.6rem; border-radius: 6px; border: 1px solid var(--border-color); color: var(--text-primary); display: inline-flex; align-items: center; gap: 0.25rem; flex-wrap: wrap;">-</span>
+                                    </div>
+                                </div>
+                                <div id="creator-result-scale-badge" style="background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.2); padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.8rem; color: var(--accent-blue); font-weight: 600; text-align: center; min-width: 120px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                                    Escala: -
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- KPI Cards Grid -->
                         <section class="kpi-grid">
                             <!-- Colombia Custom KPI -->
@@ -927,9 +1054,14 @@
                         <section class="card table-card">
                             <div class="table-header">
                                 <h2 class="chart-title">Tabla de Datos Comparativa</h2>
-                                <button class="btn-primary" id="btn-creator-export-csv" onclick="exportCustomToCSV()">
-                                    <i class="fa-solid fa-download"></i> Exportar CSV
-                                </button>
+                                <div style="display: flex; gap: 0.75rem;">
+                                    <button class="btn-primary" id="btn-creator-save-db" onclick="saveCustomIndicatorToDB()" style="background: rgba(59, 130, 246, 0.15); border: 1px solid var(--accent-blue); color: var(--accent-blue); display: flex; align-items: center; gap: 0.5rem; cursor: pointer; transition: var(--transition-smooth);">
+                                        <i class="fa-solid fa-floppy-disk"></i> Guardar en BD
+                                    </button>
+                                    <button class="btn-primary" id="btn-creator-export-csv" onclick="exportCustomToCSV()">
+                                        <i class="fa-solid fa-download"></i> Exportar CSV
+                                    </button>
+                                </div>
                             </div>
                             <div class="table-wrapper">
                                 <table class="data-table">
@@ -948,6 +1080,108 @@
                                 </table>
                             </div>
                         </section>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 8: CONSULTA INTELIGENTE (PROMPT) -->
+            <div id="consulta-section" style="display: none; height: 100%;">
+                <header class="dashboard-header">
+                    <div style="display: flex; align-items: center; gap: 1.25rem;">
+                        <button type="button" class="btn-back" onclick="history.back()" style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer; width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: var(--transition-smooth); font-size: 0.95rem; flex-shrink: 0;" title="Volver atrás">
+                            <i class="fa-solid fa-arrow-left"></i>
+                        </button>
+                        <div class="dashboard-title-area">
+                            <span class="indicator-subtitle">Asistente de Consulta en Lenguaje Natural</span>
+                            <h1 class="indicator-title">Consulta Inteligente</h1>
+                        </div>
+                    </div>
+                    <div class="api-badge" style="background: rgba(147, 51, 234, 0.1); border-color: rgba(147, 51, 234, 0.2);">
+                        <span class="dot" style="background-color: var(--accent-purple, #a855f7); box-shadow: 0 0 8px var(--accent-purple, #a855f7);"></span>
+                        <span style="color: var(--accent-purple, #a855f7); font-weight: 600;">Asistente AI</span>
+                    </div>
+                </header>
+
+                <div class="dashboard-body" style="padding-bottom: 2rem; display: grid; grid-template-columns: 1.8fr 1.2fr; gap: 1.5rem; align-items: start; height: calc(100% - 70px);">
+                    <!-- Left: Interaction Area (Chat & Prompt) -->
+                    <div style="display: flex; flex-direction: column; gap: 1rem; height: 100%;">
+                        <!-- Prompt Input Card -->
+                        <div class="card" style="margin-bottom: 0; position: relative;">
+                            <h2 class="chart-title" style="margin-bottom: 0.75rem;"><i class="fa-solid fa-wand-magic-sparkles" style="color: #a855f7; margin-right: 0.5rem;"></i> ¿Qué deseas consultar hoy?</h2>
+                            <div style="position: relative; display: flex; gap: 0.75rem;">
+                                <div style="flex: 1; position: relative;">
+                                    <input type="text" id="consulta-prompt-input" class="search-input" placeholder="Ej: Graficar pobreza extrema 3341, o Dividir 3341 entre 4789..." style="width: 100%; padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.95rem; border: 1px solid var(--border-color); background: rgba(15, 23, 42, 0.4);" autocomplete="off">
+                                    <!-- Autocomplete Dropdown -->
+                                    <div id="consulta-autocomplete-dropdown" style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: rgba(15, 23, 42, 0.95); border: 1px solid var(--border-color); border-radius: 8px; margin-top: 0.25rem; z-index: 1000; max-height: 250px; overflow-y: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.5); backdrop-filter: blur(10px);">
+                                        <!-- Suggested indicators will be inserted here -->
+                                    </div>
+                                </div>
+                                <button class="btn-primary" id="btn-consulta-submit" onclick="submitNaturalLanguageQuery()" style="background: linear-gradient(135deg, #a855f7 0%, #7e22ce 100%); color: #ffffff; font-weight: 600; padding: 0 1.5rem; border-radius: 8px; border: none; display: flex; align-items: center; gap: 0.5rem; cursor: pointer; transition: var(--transition-smooth); white-space: nowrap;">
+                                    <i class="fa-solid fa-paper-plane"></i>
+                                    <span>Consultar</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Chat & Result Area -->
+                        <div class="card" style="flex: 1; margin-bottom: 0; display: flex; flex-direction: column; overflow: hidden; height: 100%; min-height: 380px;">
+                            <div class="chart-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; margin-bottom: 1rem;">
+                                <h2 class="chart-title" style="display: flex; align-items: center; gap: 0.5rem;"><i class="fa-solid fa-message" style="color: #a855f7;"></i> <span>Historial de Respuestas</span></h2>
+                                <button class="btn-secondary" onclick="clearConsultaChat()" style="font-size: 0.75rem; padding: 0.25rem 0.6rem; border-radius: 4px; border: 1px solid var(--border-color); cursor: pointer; background: transparent; color: var(--text-secondary); transition: var(--transition-smooth);">Limpiar</button>
+                            </div>
+                            <div id="consulta-chat-container" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 1rem; padding-right: 0.5rem;">
+                                <!-- Chat bubbles loaded dynamically -->
+                                <div class="chat-bubble-assistant">
+                                    <div style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #a855f7 0%, #7e22ce 100%); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #fff; font-size: 0.85rem;">
+                                        <i class="fa-solid fa-robot"></i>
+                                    </div>
+                                    <div>
+                                        <h4 style="margin: 0 0 0.25rem 0; font-size: 0.9rem; color: #a855f7; font-weight: 600;">Asistente de Consulta</h4>
+                                        <p style="margin: 0; font-size: 0.875rem; color: var(--text-secondary);">
+                                            ¡Hola! Estoy listo para ayudarte a buscar, visualizar y combinar indicadores en el sistema.
+                                        </p>
+                                        <p style="margin: 0.5rem 0 0 0; font-size: 0.85rem; color: var(--text-muted);">
+                                            Prueba escribiendo consultas como:
+                                        </p>
+                                        <ul style="margin: 0.25rem 0 0 1.25rem; padding: 0; font-size: 0.85rem; color: var(--text-muted);">
+                                            <li>"Graficar pobreza extrema 3341"</li>
+                                            <li>"Dividir pobreza extrema 3341 entre población total 4789"</li>
+                                            <li>"Buscar desempleo" (para explorar indicadores)</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Suggested Prompts & Shortcuts -->
+                    <div class="card" style="margin-bottom: 0; display: flex; flex-direction: column; height: 100%;">
+                        <h2 class="chart-title" style="margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;"><i class="fa-solid fa-lightbulb" style="color: #eab308;"></i> <span>Sugerencias de Consultas</span></h2>
+                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1.25rem; line-height: 1.4;">
+                            Haz clic en cualquiera de las siguientes plantillas para precargar la consulta en la barra de búsqueda.
+                        </p>
+                        
+                        <div style="display: flex; flex-direction: column; gap: 0.75rem; overflow-y: auto; flex: 1;">
+                            <div class="suggestion-prompt-card" onclick="loadSuggestedPrompt('Graficar la pobreza extrema (código 3341) para Colombia y América Latina')">
+                                <span style="font-size: 0.75rem; color: #a855f7; font-weight: 600; text-transform: uppercase;">Visualizar Indicador</span>
+                                <span style="font-size: 0.85rem; color: var(--text-primary); font-weight: 500;">Graficar la pobreza extrema (código 3341)</span>
+                            </div>
+                            
+                            <div class="suggestion-prompt-card" onclick="loadSuggestedPrompt('Dividir Pobreza extrema (código 3341) entre Población total (código 4789) multiplicando por 100')">
+                                <span style="font-size: 0.75rem; color: #22c55e; font-weight: 600; text-transform: uppercase;">Combinar Indicadores</span>
+                                <span style="font-size: 0.85rem; color: var(--text-primary); font-weight: 500;">Dividir pobreza extrema (3341) entre población (4789)</span>
+                            </div>
+
+                            <div class="suggestion-prompt-card" onclick="loadSuggestedPrompt('Buscar indicadores relacionados con desempleo o mercado laboral')">
+                                <span style="font-size: 0.75rem; color: #3b82f6; font-weight: 600; text-transform: uppercase;">Buscar Temas</span>
+                                <span style="font-size: 0.85rem; color: var(--text-primary); font-weight: 500;">Buscar indicadores relacionados con desempleo</span>
+                            </div>
+
+                            <div class="suggestion-prompt-card" onclick="loadSuggestedPrompt('Tendencias de crecimiento de Colombia y ALC para 2025 y 2026')">
+                                <span style="font-size: 0.75rem; color: #f59e0b; font-weight: 600; text-transform: uppercase;">Tendencias</span>
+                                <span style="font-size: 0.85rem; color: var(--text-primary); font-weight: 500;">Ver las proyecciones de crecimiento de PBI</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1081,6 +1315,6 @@
     </div>
 
     <!-- Application Logic -->
-    <script src="app.js?v=1.0.2"></script>
+    <script src="app.js?v=1.2.0"></script>
 </body>
 </html>

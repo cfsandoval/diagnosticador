@@ -4,6 +4,9 @@
 
 // Application State
 let appState = {
+    // ...existing fields...
+    selectedRegion: 'ALC', // default region comparison
+
     treeData: null,
     selectedIndicator: null,
     indicatorData: null,
@@ -32,7 +35,9 @@ let appState = {
 const COUNTRY_DIM_ID = 208;
 const YEAR_DIM_ID = 29117;
 const COLOMBIA_MEMBER_ID = 225;
-const ALC_MEMBER_ID = 212;
+const ALC_MEMBER_ID = 212; // América Latina y el Caribe
+const LAT_MEMBER_ID = 43053; // América Latina (promedio simple)
+const LATO_MEMBER_ID = 211; // América Latina
 
 // Grouped Structural Indicators configuration
 const PYRAMID_INDICATORS = [
@@ -110,6 +115,11 @@ const API_DATA_BASE = 'https://api-cepalstat.cepal.org/cepalstat/api/v1/indicato
 
 // Initial Load
 document.addEventListener('DOMContentLoaded', () => {
+    renderFavorites();
+    // Save initial state for history navigation
+    const initialState = { section: 'explorer', indicatorId: null };
+    history.replaceState(initialState, '', '');
+
     fetchThematicTree();
     setupSearch();
     initStructuresSidebar();
@@ -154,7 +164,7 @@ async function fetchThematicTree() {
                 }
             }
         } else {
-            treeEl.innerHTML = '<li class="tree-loading">El árbol temático está vacío</li>';
+            treeEl.innerHTML = '<ul class="tree-list"></ul><div id="favorites-section" style="margin-top:1rem;"><h3 class="metadata-subtitle" style="font-size:0.75rem; letter-spacing:0.5px; font-weight:600; text-transform:uppercase; margin-bottom:0.5rem;">Indicadores de Interés</h3><ul id="favorites-list" class="tree-list"></ul></div><li class="tree-loading">El árbol temático está vacío</li>';
         }
     } catch (error) {
         console.error('Error fetching tree:', error);
@@ -168,8 +178,96 @@ async function fetchThematicTree() {
 }
 
 // Helper to recursively render the tree
+
+    // Helper to check if indicator is favorite
+    window.isIndicatorFavorite = function(id) {
+        if (id === undefined || id === null) return false;
+        try {
+            const list = JSON.parse(localStorage.getItem('favorite_indicators') || '[]');
+            if (!Array.isArray(list)) return false;
+            return list.some(item => {
+                if (!item) return false;
+                if (typeof item === 'object') {
+                    const itemId = item.id !== undefined ? item.id : item.indicator_id;
+                    if (itemId !== undefined && itemId !== null) {
+                        return itemId == id || parseInt(itemId) === parseInt(id);
+                    }
+                } else {
+                    return item == id || parseInt(item) === parseInt(id);
+                }
+                return false;
+            });
+        } catch (e) {
+            console.error("Error in isIndicatorFavorite:", e);
+            return false;
+        }
+    };
+
+    // Favorites handling
+    window.toggleFavorite = function(id, name, path, button) {
+        let list = JSON.parse(localStorage.getItem('favorite_indicators') || '[]');
+        const exists = list.find(item => parseInt(item.id) === parseInt(id));
+        let nowFav = false;
+        if (exists) {
+            // remove
+            list = list.filter(item => parseInt(item.id) !== parseInt(id));
+        } else {
+            list.push({id: parseInt(id), name, path});
+            nowFav = true;
+        }
+        localStorage.setItem('favorite_indicators', JSON.stringify(list));
+        
+        // Find and update all bookmark buttons in the document for this indicator ID
+        const buttons = document.querySelectorAll(`.favorite-btn[data-id="${id}"]`);
+        buttons.forEach(btn => {
+            if (nowFav) {
+                btn.innerHTML = '<i class="fa-solid fa-bookmark" style="color: var(--color-colombia);"></i>';
+                btn.title = "Quitar de guardados";
+            } else {
+                btn.innerHTML = '<i class="fa-regular fa-bookmark"></i>';
+                btn.title = "Guardar indicador";
+            }
+        });
+
+        renderFavorites();
+        
+        // Update mass selected count if currently in the export view
+        if (appState.currentGlobalSection === 'exportar-datos') {
+            updateMassSelectedCount();
+        }
+    };
+
+    window.renderFavorites = function() {
+        const container = document.getElementById('favorites-list');
+        if (!container) return;
+        const list = JSON.parse(localStorage.getItem('favorite_indicators') || '[]');
+        container.innerHTML = '';
+        list.forEach(item => {
+            const li = document.createElement('li');
+            li.className = 'tree-item';
+            li.innerHTML = `<span>${item.name}</span> <button class="remove-fav" data-id="${item.id}" title="Eliminar"><i class="fa-solid fa-xmark"></i></button>`;
+            li.querySelector('.remove-fav').addEventListener('click', (e) => {
+                e.stopPropagation();
+                toggleFavorite(item.id, item.name, item.path, e.target);
+            });
+            container.appendChild(li);
+        });
+    };
+function hasNonStructuralIndicators(node) {
+    if (node.indicator_id) {
+        return !PYRAMID_INDICATORS.some(p => p.id === node.indicator_id);
+    }
+    if (node.children && node.children.length > 0) {
+        return node.children.some(child => hasNonStructuralIndicators(child));
+    }
+    return false;
+}
+
 function renderTree(nodes, parentEl, pathNames) {
     nodes.forEach(node => {
+        if (!hasNonStructuralIndicators(node)) {
+            return;
+        }
         const li = document.createElement('li');
         li.className = 'tree-item';
         
@@ -206,9 +304,17 @@ function renderTree(nodes, parentEl, pathNames) {
             const leaf = document.createElement('div');
             leaf.className = 'tree-leaf';
             leaf.dataset.id = node.indicator_id;
+            
+            const isFav = isIndicatorFavorite(node.indicator_id);
+            const favIconHtml = isFav 
+                ? '<i class="fa-solid fa-bookmark" style="color: var(--color-colombia);"></i>' 
+                : '<i class="fa-regular fa-bookmark"></i>';
+            const favTitle = isFav ? "Quitar de guardados" : "Guardar indicador";
+
             leaf.innerHTML = `
                 <i class="fa-solid fa-chart-simple tree-leaf-icon"></i>
                 <span>[${node.indicator_id}] ${node.name}</span>
+                <button class="favorite-btn" data-id="${node.indicator_id}" data-name="[${node.indicator_id}] ${node.name}" data-path="${pathNames.join(' / ')}" title="${favTitle}">${favIconHtml}</button>
             `;
             
             leaf.addEventListener('click', (e) => {
@@ -223,6 +329,15 @@ function renderTree(nodes, parentEl, pathNames) {
                     categoryPath: pathNames.join(' / ')
                 });
             });
+            
+            // Favorite button handler
+            const favBtn = leaf.querySelector('.favorite-btn');
+            if (favBtn) {
+                favBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    toggleFavorite(node.indicator_id, `[${node.indicator_id}] ${node.name}`, pathNames.join(' / '), favBtn);
+                });
+            }
             
             li.appendChild(leaf);
             parentEl.appendChild(li);
@@ -308,12 +423,16 @@ function filterTreeItems(items, query) {
 }
 
 // 2. Select Indicator and Fetch Data
-async function selectIndicator(indicator) {
+async function selectIndicator(indicator, pushHistory = true) {
     appState.selectedIndicator = indicator;
     
     // Switch section if not in explorer
     if (appState.currentGlobalSection !== 'explorer') {
-        switchGlobalSection('explorer');
+        switchGlobalSection('explorer', false);
+    }
+    
+    if (pushHistory) {
+        history.pushState({ section: 'explorer', indicatorId: indicator.id }, '', '');
     }
     
     // Clear selections in structures
@@ -332,12 +451,31 @@ async function selectIndicator(indicator) {
     chartLoading.classList.add('active');
     
     try {
-        const url = `${API_DATA_BASE}/${indicator.id}/data?lang=es&members=${COLOMBIA_MEMBER_ID},${ALC_MEMBER_ID}`;
-        const response = await fetch(url);
+        const url = `${API_DATA_BASE}/${indicator.id}/data?lang=es&members=${COLOMBIA_MEMBER_ID},${ALC_MEMBER_ID},${LAT_MEMBER_ID},${LATO_MEMBER_ID}`;
+        const metaUrl = `https://api-cepalstat.cepal.org/cepalstat/api/v1/indicator/${indicator.id}/metadata?lang=es`;
+        
+        const [response, metaResponse] = await Promise.all([
+            fetch(url),
+            fetch(metaUrl).catch(err => {
+                console.error("Error fetching indicator metadata:", err);
+                return null;
+            })
+        ]);
+        
         if (!response.ok) throw new Error('No se pudieron obtener los datos de la CEPAL');
         
         const res = await response.json();
         appState.indicatorData = res.body;
+        
+        appState.indicatorMetadata = null;
+        if (metaResponse && metaResponse.ok) {
+            try {
+                const metaRes = await metaResponse.json();
+                appState.indicatorMetadata = metaRes.body.metadata;
+            } catch (err) {
+                console.error("Error parsing indicator metadata JSON:", err);
+            }
+        }
         
         // Parse metadata and details
         updateMetadataSection();
@@ -387,7 +525,63 @@ function updateMetadataSection() {
     const sources = appState.indicatorData.sources || [];
     const footnotes = appState.indicatorData.footnotes || [];
     
-    document.getElementById('meta-definition').textContent = meta.description || appState.selectedIndicator.name;
+    // Detailed metadata from endpoint
+    const detailedMeta = appState.indicatorMetadata || {};
+    
+    // 1. Definition (prefer detailed description/definition if available)
+    const definitionText = detailedMeta.definition || meta.description || appState.selectedIndicator.name;
+    document.getElementById('meta-definition').innerHTML = definitionText.trim().replace(/\r\n/g, '<br>').replace(/\n/g, '<br>');
+    
+    // 2. Unit of Measure
+    const unitText = detailedMeta.unit || meta.unit || 'No especificada';
+    document.getElementById('meta-unit').textContent = unitText;
+    
+    // 3. Theme and Area Temática
+    let themeAreaText = 'No especificado';
+    if (detailedMeta.theme || detailedMeta.area) {
+        themeAreaText = [detailedMeta.theme, detailedMeta.area].filter(Boolean).join(' / ');
+    }
+    document.getElementById('meta-theme-area').textContent = themeAreaText;
+    
+    // 4. Last update
+    const updatedText = detailedMeta.last_update || 'No disponible';
+    document.getElementById('meta-updated').textContent = updatedText;
+    
+    // 5. Methodology
+    const methodSec = document.getElementById('meta-methodology-section');
+    if (detailedMeta.calculation_methodology) {
+        methodSec.style.display = 'block';
+        document.getElementById('meta-methodology').innerHTML = detailedMeta.calculation_methodology;
+    } else {
+        methodSec.style.display = 'none';
+    }
+    
+    // 6. Data features (Characteristics)
+    const featuresSec = document.getElementById('meta-features-section');
+    if (detailedMeta.data_features) {
+        featuresSec.style.display = 'block';
+        document.getElementById('meta-features').innerHTML = detailedMeta.data_features.trim().replace(/\r\n/g, '<br>').replace(/\n/g, '<br>');
+    } else {
+        featuresSec.style.display = 'none';
+    }
+    
+    // 7. Indicator note
+    const noteSec = document.getElementById('meta-note-section');
+    if (detailedMeta.note && detailedMeta.note.trim() !== '') {
+        noteSec.style.display = 'block';
+        document.getElementById('meta-note').innerHTML = detailedMeta.note.trim().replace(/\r\n/g, '<br>').replace(/\n/g, '<br>');
+    } else {
+        noteSec.style.display = 'none';
+    }
+    
+    // 8. Comments & Observations
+    const commentsSec = document.getElementById('meta-comments-section');
+    if (detailedMeta.comments) {
+        commentsSec.style.display = 'block';
+        document.getElementById('meta-comments').innerHTML = detailedMeta.comments;
+    } else {
+        commentsSec.style.display = 'none';
+    }
     
     // Format Sources
     if (sources.length > 0) {
@@ -492,6 +686,18 @@ function renderDashboardData() {
     const chartLoading = document.getElementById('chart-loading');
     chartLoading.classList.add('active');
     
+    // Update dynamic region labels based on selected comparison
+    let regionLabel = 'América Latina y el Caribe';
+    if (appState.selectedRegion === 'LAT') {
+        regionLabel = 'América Latina (promedio simple)';
+    } else if (appState.selectedRegion === 'LATO') {
+        regionLabel = 'América Latina';
+    }
+    const kpiTitle = document.getElementById('kpi-alc-title');
+    if (kpiTitle) kpiTitle.textContent = regionLabel;
+    const tableHeader = document.getElementById('table-alc-header');
+    if (tableHeader) tableHeader.textContent = regionLabel;
+    
     // Process Data list
     const rawData = appState.indicatorData.data || [];
     const dimensions = appState.indicatorData.dimensions || [];
@@ -542,7 +748,12 @@ function renderDashboardData() {
         if (countryId === COLOMBIA_MEMBER_ID) {
             colombiaData[yearLabel] = val;
             yearsSet.add(yearLabel);
-        } else if (countryId === ALC_MEMBER_ID) {
+        } else if (
+            (appState.selectedRegion === 'ALC' && countryId === ALC_MEMBER_ID) ||
+            (appState.selectedRegion === 'LAT' && countryId === LAT_MEMBER_ID) ||
+            (appState.selectedRegion === 'LATO' && countryId === LATO_MEMBER_ID)
+        ) {
+            // Region comparison data (ALC or LAT or LATO)
             alcData[yearLabel] = val;
             yearsSet.add(yearLabel);
         }
@@ -552,7 +763,7 @@ function renderDashboardData() {
     const sortedYears = Array.from(yearsSet).sort((a, b) => parseInt(a) - parseInt(b));
     
     if (sortedYears.length === 0) {
-        showError('No hay datos disponibles para comparar Colombia y América Latina y el Caribe en los filtros seleccionados.');
+        showError(`No hay datos disponibles para comparar Colombia y ${regionLabel} en los filtros seleccionados.`);
         chartLoading.classList.remove('active');
         clearKpis();
         return;
@@ -588,6 +799,17 @@ function showError(msg) {
     if (appState.chartInstance) {
         appState.chartInstance.destroy();
         appState.chartInstance = null;
+    }
+}
+
+// Handle region selector change and reload data
+function handleRegionChange() {
+    const selectEl = document.getElementById('region-comparison');
+    if (!selectEl) return;
+    appState.selectedRegion = selectEl.value;
+    // If indicator data is already loaded, just re-render with new region filter
+    if (appState.indicatorData) {
+        renderDashboardData();
     }
 }
 
@@ -708,10 +930,11 @@ function updateKpiCards(years, colData, alcData) {
             if (gapIcon) gapIcon.className = 'fa-solid fa-scale-unbalanced';
             const dir = absGap >= 0 ? 'up' : 'down';
             const relation = absGap >= 0 ? 'mayor que' : 'menor que';
+            const regionAcronym = appState.selectedRegion === 'LAT' ? 'AL (promedio simple)' : (appState.selectedRegion === 'LATO' ? 'AL' : 'ALC');
             gapPctEl.className = `kpi-trend ${dir}`;
             gapPctEl.innerHTML = `
                 <i class="fa-solid ${absGap >= 0 ? 'fa-plus' : 'fa-minus'}"></i>
-                <span>${formatNumber(Math.abs(pctGap))}% ${relation} promedio ALC (${latestYearBoth})<br>
+                <span>${formatNumber(Math.abs(pctGap))}% ${relation} promedio ${regionAcronym} (${latestYearBoth})<br>
                 <span style="font-size: 0.72rem; color: var(--text-secondary); display: inline-block; margin-top: 4px;">
                     DRE (Desviación Relativa Estándar): <strong>${dre >= 0 ? '+' : ''}${formatNumber(dre)}</strong>
                 </span></span>
@@ -811,7 +1034,7 @@ function drawChart(years, colombiaSeries, alcSeries) {
                     } : undefined
                 },
                 {
-                    label: 'América Latina y el Caribe',
+                    label: appState.selectedRegion === 'LAT' ? 'América Latina (promedio simple)' : (appState.selectedRegion === 'LATO' ? 'América Latina' : 'América Latina y el Caribe'),
                     data: alcSeries,
                     borderColor: isLine ? 'rgba(168, 85, 247, 1)' : (context) => {
                         const yr = parseInt(years[context.dataIndex]);
@@ -994,6 +1217,15 @@ function generateDiagnostic(years, colData, alcData) {
 }
 
 function generateDiagnosticHtmlText(years, colData, alcData, metadata) {
+    let regionLabel = 'América Latina y el Caribe';
+    let regionAcronym = 'ALC';
+    if (appState.selectedRegion === 'LAT') {
+        regionLabel = 'América Latina (promedio simple)';
+        regionAcronym = 'AL (promedio simple)';
+    } else if (appState.selectedRegion === 'LATO') {
+        regionLabel = 'América Latina';
+        regionAcronym = 'AL';
+    }
     // Extract key indices
     const validYears = years.filter(yr => colData[yr] !== undefined && alcData[yr] !== undefined);
     if (validYears.length === 0) {
@@ -1050,10 +1282,10 @@ function generateDiagnosticHtmlText(years, colData, alcData, metadata) {
             introReal += `estable. `;
         }
         
-        introReal += `Por su parte, el agregado de América Latina y el Caribe (ALC) evolucionó a un ritmo del <strong>${formatNumber(alcCagrReal)}%</strong> anual.</p>`;
+        introReal += `Por su parte, el agregado de ${regionLabel} (${regionAcronym}) evolucionó a un ritmo del <strong>${formatNumber(alcCagrReal)}%</strong> anual.</p>`;
         
         const relationReal = colEndReal >= alcEndReal ? 'por encima de' : 'por debajo de';
-        let gapRealText = `<p style="margin-top: 0.5rem;">Al cierre del registro real en <strong>${endReal}</strong>, Colombia se ubicaba <strong>${formatNumber(Math.abs(endGapReal))} unidades</strong> (${relationReal}) del promedio de ALC (diferencia del <strong>${formatNumber(Math.abs(endGapPctReal))}%</strong>). `;
+        let gapRealText = `<p style="margin-top: 0.5rem;">Al cierre del registro real en <strong>${endReal}</strong>, Colombia se ubicaba <strong>${formatNumber(Math.abs(endGapReal))} unidades</strong> (${relationReal}) del promedio de ${regionAcronym} (diferencia del <strong>${formatNumber(Math.abs(endGapPctReal))}%</strong>). `;
         
         if (gapClosingReal) {
             gapRealText += `Esto evidencia un proceso histórico de <strong>convergencia</strong>, reduciendo la brecha inicial del <strong>${formatNumber(Math.abs(startGapPctReal))}%</strong> registrada en <strong>${startReal}</strong>.</p>`;
@@ -1063,7 +1295,7 @@ function generateDiagnosticHtmlText(years, colData, alcData, metadata) {
         
         const relationPeakReal = maxGapDirectionReal >= 0 ? 'superior' : 'inferior';
         let bulletReal = `<ul class="diagnostic-list" style="margin-top: 0.5rem; margin-bottom: 1rem;">`;
-        bulletReal += `<li><strong>Brecha Histórica Máxima:</strong> Ocurrió en el año <strong>${maxGapYearReal}</strong>, donde el dato de Colombia estuvo <strong>${formatNumber(maxAbsGapReal)} unidades</strong> (${relationPeakReal}) respecto a la media de ALC.</li>`;
+        bulletReal += `<li><strong>Brecha Histórica Máxima:</strong> Ocurrió en el año <strong>${maxGapYearReal}</strong>, donde el dato de Colombia estuvo <strong>${formatNumber(maxAbsGapReal)} unidades</strong> (${relationPeakReal}) respecto a la media de ${regionAcronym}.</li>`;
         bulletReal += `</ul>`;
         
         const unit = metadata ? metadata.unit : '';
@@ -1140,7 +1372,7 @@ function generateDiagnosticHtmlText(years, colData, alcData, metadata) {
                     <li>📉 <strong>Punto Mínimo:</strong> Se registró un valor de <strong>${formatNumber(minColVal)}${unitSuffix}</strong> en el año <strong>${minColYear}</strong>.</li>
                     <li>🔄 <strong>Variación Neta:</strong> La variable experimentó un cambio absoluto de <strong>${absChange >= 0 ? '+' : ''}${formatNumber(absChange)}${unitSuffix}</strong> (<strong>${pctChange >= 0 ? '+' : ''}${formatNumber(pctChange)}%</strong>) entre <strong>${firstYear}</strong> y <strong>${lastYear}</strong>.</li>
                     ${yoyHtml}
-                    <li>📊 <strong>Dinámica Relativa:</strong> Colombia ha evolucionado a un ritmo <strong>${comparisonText}</strong> que el promedio de América Latina y el Caribe (CAGR de <strong>${formatNumber(colCagrReal)}%</strong> vs. <strong>${formatNumber(alcCagrReal)}%</strong>).</li>
+                    <li>📊 <strong>Dinámica Relativa:</strong> Colombia ha evolucionado a un ritmo <strong>${comparisonText}</strong> que el promedio de ${regionLabel} (CAGR de <strong>${formatNumber(colCagrReal)}%</strong> vs. <strong>${formatNumber(alcCagrReal)}%</strong>).</li>
                 </ul>
             </div>`;
         }
@@ -1150,7 +1382,7 @@ function generateDiagnosticHtmlText(years, colData, alcData, metadata) {
             <h4 style="color: var(--accent-green); margin-bottom: 0.75rem;"><i class="fa-solid fa-arrow-trend-up"></i> Principales Tendencias Históricas</h4>
             <ul style="margin-left: 1.5rem; color: var(--text-secondary); font-size: 0.9rem; line-height: 1.6;">
                 <li><strong>Colombia:</strong> Presenta una tendencia de <strong>${getTrendDescription(colCagrReal)}</strong>, con una tasa promedio del <strong>${formatNumber(colCagrReal)}%</strong> anual.</li>
-                <li><strong>América Latina y el Caribe:</strong> Muestra una dinámica de <strong>${getTrendDescription(alcCagrReal)}</strong>, variando al <strong>${formatNumber(alcCagrReal)}%</strong> anual en promedio.</li>
+                <li><strong>${regionLabel}:</strong> Muestra una dinámica de <strong>${getTrendDescription(alcCagrReal)}</strong>, variando al <strong>${formatNumber(alcCagrReal)}%</strong> anual en promedio.</li>
             </ul>
         </div>`;
         
@@ -1182,10 +1414,10 @@ function generateDiagnosticHtmlText(years, colData, alcData, metadata) {
         
         let introProj = `<h4><i class="fa-solid fa-chart-line" style="color: var(--color-alc);"></i> Escenario de Proyección Prospectiva (Período ${baseYear} - ${endProj})</h4>`;
         introProj += `<p>Las estimaciones oficiales proyectan que Colombia mantendrá un ritmo de cambio del <strong>${formatNumber(colCagrProj)}%</strong> anual hasta el año <strong>${endProj}</strong>. `;
-        introProj += `Para ALC, el comportamiento esperado se sitúa en un <strong>${formatNumber(alcCagrProj)}%</strong> anual.</p>`;
+        introProj += `Para ${regionAcronym}, el comportamiento esperado se sitúa en un <strong>${formatNumber(alcCagrProj)}%</strong> anual.</p>`;
         
         const relationProj = colEndProj >= alcEndProj ? 'por encima del' : 'por debajo del';
-        let gapProjText = `<p style="margin-top: 0.5rem;">En el horizonte futuro de <strong>${endProj}</strong>, los modelos matemáticos prevén que Colombia se ubique <strong>${formatNumber(Math.abs(endGapProj))} unidades</strong> (${relationProj}) promedio de ALC (brecha de <strong>${formatNumber(Math.abs(endGapPctProj))}%</strong>). `;
+        let gapProjText = `<p style="margin-top: 0.5rem;">En el horizonte futuro de <strong>${endProj}</strong>, los modelos matemáticos prevén que Colombia se ubique <strong>${formatNumber(Math.abs(endGapProj))} unidades</strong> (${relationProj}) promedio de ${regionAcronym} (brecha de <strong>${formatNumber(Math.abs(endGapPctProj))}%</strong>). `;
         
         if (gapClosingProj) {
             gapProjText += `Esto sugiere un escenario futuro de **convergencia tardía**, donde la brecha proyectada tiende a estrecharse frente al punto de partida real.</p>`;
@@ -1198,7 +1430,7 @@ function generateDiagnosticHtmlText(years, colData, alcData, metadata) {
             <h4 style="color: #c084fc; margin-bottom: 0.75rem;"><i class="fa-solid fa-arrow-trend-up"></i> Tendencias Futuras Proyectadas</h4>
             <ul style="margin-left: 1.5rem; color: var(--text-secondary); font-size: 0.9rem; line-height: 1.6;">
                 <li><strong>Colombia:</strong> Proyecta una tendencia de <strong>${getTrendDescription(colCagrProj)}</strong> hacia ${endProj} (${formatNumber(colCagrProj)}% anual).</li>
-                <li><strong>América Latina y el Caribe:</strong> Se prevé una dinámica de <strong>${getTrendDescription(alcCagrProj)}</strong> (${formatNumber(alcCagrProj)}% anual).</li>
+                <li><strong>${regionLabel}:</strong> Se prevé una dinámica de <strong>${getTrendDescription(alcCagrProj)}</strong> (${formatNumber(alcCagrProj)}% anual).</li>
             </ul>
         </div>`;
         
@@ -1224,7 +1456,8 @@ function exportToCSV() {
     const rows = tableBody.querySelectorAll('tr');
     
     let csvContent = '\uFEFF'; // UTF-8 BOM
-    csvContent += 'Año,Colombia,América Latina y el Caribe,Brecha Absoluta,Brecha Porcentual\n';
+    const regionHeader = appState.selectedRegion === 'LAT' ? 'América Latina (promedio simple)' : (appState.selectedRegion === 'LATO' ? 'América Latina' : 'América Latina y el Caribe');
+    csvContent += `Año,Colombia,${regionHeader},Brecha Absoluta,Brecha Porcentual\n`;
     
     rows.forEach(tr => {
         const tds = tr.querySelectorAll('td');
@@ -1260,7 +1493,7 @@ function exportToCSV() {
 }
 
 // 11. Global Section Switching Logic
-function switchGlobalSection(sectionId) {
+function switchGlobalSection(sectionId, pushHistory = true) {
     appState.currentGlobalSection = sectionId;
     
     // Toggle visibility of main sections
@@ -1286,6 +1519,11 @@ function switchGlobalSection(sectionId) {
     const creadorSection = document.getElementById('creador-section');
     if (creadorSection) {
         creadorSection.style.display = sectionId === 'creador' ? 'block' : 'none';
+    }
+    
+    const consultaSection = document.getElementById('consulta-section');
+    if (consultaSection) {
+        consultaSection.style.display = sectionId === 'consulta' ? 'block' : 'none';
     }
     
     // Update sidebar brechas button active highlight
@@ -1316,21 +1554,36 @@ function switchGlobalSection(sectionId) {
     if (sidebarCreadorBtn) {
         sidebarCreadorBtn.classList.toggle('active', sectionId === 'creador');
     }
+
+    const sidebarConsultaBtn = document.getElementById('sidebar-consulta-btn');
+    if (sidebarConsultaBtn) {
+        sidebarConsultaBtn.classList.toggle('active', sectionId === 'consulta');
+    }
     
     // Auto load first indicator of structures if none is loaded yet
     if (sectionId === 'structures' && !appState.pyramidData) {
-        selectPyramidIndicator(appState.selectedPyramidIndicatorId);
+        selectPyramidIndicator(appState.selectedPyramidIndicatorId, false);
+    }
+    
+    if (pushHistory) {
+        if (sectionId === 'explorer') {
+            history.pushState({ section: 'explorer', indicatorId: appState.selectedIndicator ? appState.selectedIndicator.id : null }, '', '');
+        } else if (sectionId === 'structures') {
+            history.pushState({ section: 'structures', pyramidId: appState.selectedPyramidIndicatorId }, '', '');
+        } else {
+            history.pushState({ section: sectionId }, '', '');
+        }
     }
 }
 
 // 11b. Click handler for sidebar Brechas section
-function selectBrechasSection() {
-    switchGlobalSection('brechas');
+function selectBrechasSection(pushHistory = true) {
+    switchGlobalSection('brechas', pushHistory);
     
     // Clear selections in the thematic tree and structures
     document.querySelectorAll('.tree-leaf').forEach(el => el.classList.remove('selected'));
     document.querySelectorAll('.structures-list-item').forEach(el => {
-        if (el.id !== 'sidebar-brechas-btn' && el.id !== 'sidebar-metodologia-btn' && el.id !== 'sidebar-tendencias-btn' && el.id !== 'sidebar-exportar-datos-btn' && el.id !== 'sidebar-creador-btn') {
+        if (el.id !== 'sidebar-brechas-btn' && el.id !== 'sidebar-metodologia-btn' && el.id !== 'sidebar-tendencias-btn' && el.id !== 'sidebar-exportar-datos-btn' && el.id !== 'sidebar-creador-btn' && el.id !== 'sidebar-consulta-btn') {
             el.classList.remove('active');
         }
     });
@@ -1339,26 +1592,26 @@ function selectBrechasSection() {
 }
 
 // 11c. Click handler for sidebar Metodología section
-function selectMetodologiaSection() {
-    switchGlobalSection('metodologia');
+function selectMetodologiaSection(pushHistory = true) {
+    switchGlobalSection('metodologia', pushHistory);
     
     // Clear selections in the thematic tree and structures
     document.querySelectorAll('.tree-leaf').forEach(el => el.classList.remove('selected'));
     document.querySelectorAll('.structures-list-item').forEach(el => {
-        if (el.id !== 'sidebar-metodologia-btn' && el.id !== 'sidebar-brechas-btn' && el.id !== 'sidebar-tendencias-btn' && el.id !== 'sidebar-exportar-datos-btn' && el.id !== 'sidebar-creador-btn') {
+        if (el.id !== 'sidebar-metodologia-btn' && el.id !== 'sidebar-brechas-btn' && el.id !== 'sidebar-tendencias-btn' && el.id !== 'sidebar-exportar-datos-btn' && el.id !== 'sidebar-creador-btn' && el.id !== 'sidebar-consulta-btn') {
             el.classList.remove('active');
         }
     });
 }
 
 // 11d. Click handler for sidebar Tendencias section
-function selectTendenciasSection() {
-    switchGlobalSection('tendencias');
+function selectTendenciasSection(pushHistory = true) {
+    switchGlobalSection('tendencias', pushHistory);
     
     // Clear selections in the thematic tree and structures
     document.querySelectorAll('.tree-leaf').forEach(el => el.classList.remove('selected'));
     document.querySelectorAll('.structures-list-item').forEach(el => {
-        if (el.id !== 'sidebar-tendencias-btn' && el.id !== 'sidebar-brechas-btn' && el.id !== 'sidebar-metodologia-btn' && el.id !== 'sidebar-exportar-datos-btn' && el.id !== 'sidebar-creador-btn') {
+        if (el.id !== 'sidebar-tendencias-btn' && el.id !== 'sidebar-brechas-btn' && el.id !== 'sidebar-metodologia-btn' && el.id !== 'sidebar-exportar-datos-btn' && el.id !== 'sidebar-creador-btn' && el.id !== 'sidebar-consulta-btn') {
             el.classList.remove('active');
         }
     });
@@ -1367,13 +1620,13 @@ function selectTendenciasSection() {
 }
 
 // 11e. Click handler for sidebar Exportar Datos section
-function selectExportarDatosSection() {
-    switchGlobalSection('exportar-datos');
+function selectExportarDatosSection(pushHistory = true) {
+    switchGlobalSection('exportar-datos', pushHistory);
     
     // Clear selections in the thematic tree and structures
     document.querySelectorAll('.tree-leaf').forEach(el => el.classList.remove('selected'));
     document.querySelectorAll('.structures-list-item').forEach(el => {
-        if (el.id !== 'sidebar-exportar-datos-btn' && el.id !== 'sidebar-brechas-btn' && el.id !== 'sidebar-metodologia-btn' && el.id !== 'sidebar-tendencias-btn' && el.id !== 'sidebar-creador-btn') {
+        if (el.id !== 'sidebar-exportar-datos-btn' && el.id !== 'sidebar-brechas-btn' && el.id !== 'sidebar-metodologia-btn' && el.id !== 'sidebar-tendencias-btn' && el.id !== 'sidebar-creador-btn' && el.id !== 'sidebar-consulta-btn') {
             el.classList.remove('active');
         }
     });
@@ -1382,19 +1635,105 @@ function selectExportarDatosSection() {
 }
 
 // 11f. Click handler for sidebar Creador section
-function selectCreadorSection() {
-    switchGlobalSection('creador');
+function selectCreadorSection(pushHistory = true) {
+    switchGlobalSection('creador', pushHistory);
     
     // Clear selections in the thematic tree and structures
     document.querySelectorAll('.tree-leaf').forEach(el => el.classList.remove('selected'));
     document.querySelectorAll('.structures-list-item').forEach(el => {
-        if (el.id !== 'sidebar-creador-btn' && el.id !== 'sidebar-exportar-datos-btn' && el.id !== 'sidebar-brechas-btn' && el.id !== 'sidebar-metodologia-btn' && el.id !== 'sidebar-tendencias-btn') {
+        if (el.id !== 'sidebar-creador-btn' && el.id !== 'sidebar-exportar-datos-btn' && el.id !== 'sidebar-brechas-btn' && el.id !== 'sidebar-metodologia-btn' && el.id !== 'sidebar-tendencias-btn' && el.id !== 'sidebar-consulta-btn') {
             el.classList.remove('active');
         }
     });
     
     initCreadorSection();
 }
+
+// Click handler for sidebar Consulta section
+function selectConsultaSection(pushHistory = true) {
+    switchGlobalSection('consulta', pushHistory);
+    
+    // Clear selections in the thematic tree and structures
+    document.querySelectorAll('.tree-leaf').forEach(el => el.classList.remove('selected'));
+    document.querySelectorAll('.structures-list-item').forEach(el => {
+        if (el.id !== 'sidebar-consulta-btn' && el.id !== 'sidebar-creador-btn' && el.id !== 'sidebar-exportar-datos-btn' && el.id !== 'sidebar-brechas-btn' && el.id !== 'sidebar-metodologia-btn' && el.id !== 'sidebar-tendencias-btn') {
+            el.classList.remove('active');
+        }
+    });
+    
+    setupConsultaAutocomplete();
+}
+
+// 11g. Return to home landing page
+function goHome(pushHistory = true) {
+    appState.selectedIndicator = null;
+    switchGlobalSection('explorer', false);
+    
+    // Clear selections in tree
+    document.querySelectorAll('.tree-leaf').forEach(el => el.classList.remove('selected'));
+    
+    // Show empty state, hide dashboard
+    document.getElementById('empty-state').style.display = 'flex';
+    document.getElementById('dashboard-container').style.display = 'none';
+    
+    if (pushHistory) {
+        history.pushState({ section: 'explorer', indicatorId: null }, '', '');
+    }
+}
+
+// 11h. Find indicator by ID in flat indicators
+function findIndicatorById(id) {
+    if (appState.flatIndicators) {
+        return appState.flatIndicators.find(ind => ind.id === id);
+    }
+    return null;
+}
+
+// 11i. Restore navigation state
+function restoreState(state, pushHistory = false) {
+    if (!state) return;
+    
+    const { section, indicatorId, pyramidId } = state;
+    
+    if (section === 'explorer') {
+        if (indicatorId) {
+            const ind = findIndicatorById(indicatorId);
+            if (ind) {
+                selectIndicator(ind, pushHistory);
+            } else {
+                goHome(pushHistory);
+            }
+        } else {
+            goHome(pushHistory);
+        }
+    } else if (section === 'structures') {
+        switchGlobalSection('structures', pushHistory);
+        if (pyramidId) {
+            selectPyramidIndicator(pyramidId, pushHistory);
+        }
+    } else if (section === 'brechas') {
+        selectBrechasSection(pushHistory);
+    } else if (section === 'metodologia') {
+        selectMetodologiaSection(pushHistory);
+    } else if (section === 'tendencias') {
+        selectTendenciasSection(pushHistory);
+    } else if (section === 'exportar-datos') {
+        selectExportarDatosSection(pushHistory);
+    } else if (section === 'creador') {
+        selectCreadorSection(pushHistory);
+    } else if (section === 'consulta') {
+        selectConsultaSection(pushHistory);
+    }
+}
+
+// 11j. Listen for history popstate events (browser Back/Forward)
+window.addEventListener('popstate', (event) => {
+    if (event.state) {
+        restoreState(event.state, false);
+    } else {
+        restoreState({ section: 'explorer', indicatorId: null }, false);
+    }
+});
 
 // 12. Initialize Sidebar for Structures
 function initStructuresSidebar() {
@@ -1418,12 +1757,16 @@ function initStructuresSidebar() {
 }
 
 // 13. Select Structures Indicator
-function selectPyramidIndicator(indicatorId) {
+function selectPyramidIndicator(indicatorId, pushHistory = true) {
     appState.selectedPyramidIndicatorId = indicatorId;
     
     // Switch section if not in structures
     if (appState.currentGlobalSection !== 'structures') {
-        switchGlobalSection('structures');
+        switchGlobalSection('structures', false);
+    }
+    
+    if (pushHistory) {
+        history.pushState({ section: 'structures', pyramidId: indicatorId }, '', '');
     }
     
     // Clear selections in the thematic tree
@@ -2746,6 +3089,9 @@ function flattenThematicTree(nodes, pathNames = [], flatList = []) {
         if (isCategory) {
             flattenThematicTree(node.children, currentPath, flatList);
         } else if (node.indicator_id) {
+            if (PYRAMID_INDICATORS.some(p => p.id === node.indicator_id)) {
+                return;
+            }
             flatList.push({
                 id: node.indicator_id,
                 name: node.name,
@@ -3595,13 +3941,18 @@ function openXlsExportModal() {
             div.innerHTML = `
                 <label class="report-checkbox-item" style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
                     <div style="display: flex; align-items: center; gap: 0.65rem;">
-                        <input type="checkbox" class="xls-category-checkbox" value="${cat}" checked onchange="updateXlsSelectedCount()">
+                        <input type="checkbox" class="xls-category-checkbox" value="${cat}" onchange="updateXlsSelectedCount()">
                         <span>${cat}</span>
                     </div>
                     <span style="font-size: 0.75rem; color: var(--text-muted); background: rgba(255,255,255,0.03); padding: 0.15rem 0.45rem; border-radius: 4px;">${count} ind.</span>
                 </label>
             `;
             checklistContainer.appendChild(div);
+        });
+        
+        // Explicitly set XLS checkboxes checked state programmatically
+        document.querySelectorAll('.xls-category-checkbox').forEach(cb => {
+            cb.checked = true;
         });
     }
     
@@ -4308,6 +4659,8 @@ let massState = {
     cancelled: false,
     flatIndicators: [],
     categories: {},
+    hierarchy: {},
+    selectedSubcategories: new Set(),
     selectedCategories: new Set(),
     results: [],
     sortColumn: null,
@@ -4328,25 +4681,39 @@ function initExportarDatosSection() {
     document.getElementById('btn-mass-excel').style.display = 'inline-flex';
     document.getElementById('btn-mass-cancel').style.display = 'none';
     
-    // Group indicators by top category
+    // Group indicators by top category and subcategory
     massState.flatIndicators = appState.flatIndicators || [];
-    massState.categories = {};
+    massState.hierarchy = {};
     
     massState.flatIndicators.forEach(ind => {
-        const cat = ind.topCategory || 'General';
-        if (!massState.categories[cat]) {
-            massState.categories[cat] = [];
+        const parts = ind.categoryPath ? ind.categoryPath.split(' / ') : [];
+        const topCat = parts[0] || 'General';
+        const subCat = parts[1] || 'General';
+        
+        if (!massState.hierarchy[topCat]) {
+            massState.hierarchy[topCat] = {};
         }
-        massState.categories[cat].push(ind);
+        if (!massState.hierarchy[topCat][subCat]) {
+            massState.hierarchy[topCat][subCat] = [];
+        }
+        massState.hierarchy[topCat][subCat].push(ind);
+    });
+    
+    // Default select all subcategories
+    massState.selectedSubcategories = new Set();
+    Object.keys(massState.hierarchy).forEach(topCat => {
+        Object.keys(massState.hierarchy[topCat]).forEach(subCat => {
+            massState.selectedSubcategories.add(`${topCat} - ${subCat}`);
+        });
     });
     
     // Render checklist
     const checklistContainer = document.getElementById('mass-categories-checklist');
     if (checklistContainer) {
         checklistContainer.innerHTML = '';
-        const categories = Object.keys(massState.categories).sort();
+        const topCategories = Object.keys(massState.hierarchy).sort();
         
-        if (categories.length === 0) {
+        if (topCategories.length === 0) {
             checklistContainer.innerHTML = '<div style="color: var(--text-muted); font-size: 0.8125rem;">Cargando listado de indicadores...</div>';
             document.getElementById('btn-mass-show').setAttribute('disabled', 'true');
             document.getElementById('btn-mass-excel').setAttribute('disabled', 'true');
@@ -4356,39 +4723,143 @@ function initExportarDatosSection() {
         document.getElementById('btn-mass-show').removeAttribute('disabled');
         document.getElementById('btn-mass-excel').removeAttribute('disabled');
         
-        categories.forEach(cat => {
-            const count = massState.categories[cat].length;
-            const div = document.createElement('div');
-            div.innerHTML = `
-                <label class="report-checkbox-item" style="display: flex; align-items: center; justify-content: space-between; width: 100%; cursor: pointer;">
-                    <div style="display: flex; align-items: center; gap: 0.65rem;">
-                        <input type="checkbox" class="mass-category-checkbox" value="${cat}" checked onchange="updateMassSelectedCount()">
-                        <span>${cat}</span>
-                    </div>
-                    <span style="font-size: 0.75rem; color: var(--text-muted); background: rgba(255,255,255,0.03); padding: 0.15rem 0.45rem; border-radius: 4px;">${count} ind.</span>
+        topCategories.forEach(topCat => {
+            const subCatsObj = massState.hierarchy[topCat];
+            const subCats = Object.keys(subCatsObj).sort();
+            
+            // Total indicators in this top category
+            let topCatCount = 0;
+            subCats.forEach(sub => {
+                topCatCount += subCatsObj[sub].length;
+            });
+            
+            const groupDiv = document.createElement('div');
+            groupDiv.className = 'category-group';
+            groupDiv.style.cssText = 'border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; background: rgba(15, 23, 42, 0.2); display: flex; flex-direction: column; gap: 0.5rem;';
+            
+            // Header for top category with select all checkbox
+            const headerDiv = document.createElement('div');
+            headerDiv.style.cssText = 'display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 0.4rem;';
+            headerDiv.innerHTML = `
+                <label style="display: flex; align-items: center; gap: 0.5rem; font-weight: 600; font-size: 0.875rem; color: var(--accent-blue); cursor: pointer; margin-bottom: 0;">
+                    <input type="checkbox" class="mass-topcat-checkbox" value="${topCat}" onchange="toggleTopCat('${topCat}', this.checked)">
+                    <span>${topCat}</span>
                 </label>
+                <span style="font-size: 0.72rem; color: var(--text-muted); background: rgba(255,255,255,0.03); padding: 0.1rem 0.35rem; border-radius: 4px;">${topCatCount} ind.</span>
             `;
-            checklistContainer.appendChild(div);
+            groupDiv.appendChild(headerDiv);
+            
+            // Subcategories list
+            const subListDiv = document.createElement('div');
+            subListDiv.style.cssText = 'display: flex; flex-direction: column; gap: 0.4rem; padding-left: 0.25rem;';
+            
+            subCats.forEach(subCat => {
+                const count = subCatsObj[subCat].length;
+                const subLabel = document.createElement('label');
+                subLabel.style.cssText = 'display: flex; align-items: center; justify-content: space-between; font-size: 0.8125rem; cursor: pointer; color: var(--text-secondary); margin-bottom: 0;';
+                subLabel.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <input type="checkbox" class="mass-subcat-checkbox" data-topcat="${topCat}" value="${subCat}" onchange="updateMassSelectedCount()">
+                        <span>${subCat}</span>
+                    </div>
+                    <span style="font-size: 0.7rem; color: var(--text-muted);">${count} ind.</span>
+                `;
+                subListDiv.appendChild(subLabel);
+            });
+            
+            groupDiv.appendChild(subListDiv);
+            checklistContainer.appendChild(groupDiv);
+        });
+        
+        // Explicitly set checkboxes checked state programmatically
+        document.querySelectorAll('.mass-subcat-checkbox').forEach(cb => {
+            cb.checked = true;
+        });
+        document.querySelectorAll('.mass-topcat-checkbox').forEach(cb => {
+            cb.checked = true;
         });
     }
     
     updateMassSelectedCount();
 }
 
+function toggleTopCat(topCat, checked) {
+    document.querySelectorAll(`.mass-subcat-checkbox[data-topcat="${topCat}"]`).forEach(cb => {
+        cb.checked = checked;
+    });
+    updateMassSelectedCount();
+}
+
 function updateMassSelectedCount() {
-    const checkboxes = document.querySelectorAll('.mass-category-checkbox:checked');
+    const checkboxes = document.querySelectorAll('.mass-subcat-checkbox:checked');
+    const onlyFavorites = document.getElementById('mass-only-favorites')?.checked;
     let totalCount = 0;
     
-    massState.selectedCategories = new Set();
+    // Diagnostic logging for debugging favorite indicators issues
+    const list = JSON.parse(localStorage.getItem('favorite_indicators') || '[]');
+    console.log("updateMassSelectedCount: onlyFavorites =", onlyFavorites, "local favorites list =", list);
+    
+    massState.selectedSubcategories = new Set();
     checkboxes.forEach(cb => {
-        const cat = cb.value;
-        massState.selectedCategories.add(cat);
-        totalCount += (massState.categories[cat] ? massState.categories[cat].length : 0);
+        const topCat = cb.dataset.topcat;
+        const subCat = cb.value;
+        const key = `${topCat} - ${subCat}`;
+        massState.selectedSubcategories.add(key);
+        if (massState.hierarchy[topCat] && massState.hierarchy[topCat][subCat]) {
+            if (onlyFavorites) {
+                const subCatFavs = massState.hierarchy[topCat][subCat].filter(ind => {
+                    const isFav = isIndicatorFavorite(ind.id);
+                    console.log(`Checking ind [${ind.id}] ${ind.name}: isFav =`, isFav);
+                    return isFav;
+                });
+                totalCount += subCatFavs.length;
+            } else {
+                totalCount += massState.hierarchy[topCat][subCat].length;
+            }
+        }
     });
+    
+    // Update parent top category checkboxes to reflect checked/unchecked/indeterminate state
+    if (massState.hierarchy) {
+        Object.keys(massState.hierarchy).forEach(topCat => {
+            const subCbs = document.querySelectorAll(`.mass-subcat-checkbox[data-topcat="${topCat}"]`);
+            const checkedSubCbs = document.querySelectorAll(`.mass-subcat-checkbox[data-topcat="${topCat}"]:checked`);
+            const topCb = document.querySelector(`.mass-topcat-checkbox[value="${topCat}"]`);
+            if (topCb) {
+                if (checkedSubCbs.length === 0) {
+                    topCb.checked = false;
+                    topCb.indeterminate = false;
+                } else if (checkedSubCbs.length === subCbs.length) {
+                    topCb.checked = true;
+                    topCb.indeterminate = false;
+                } else {
+                    topCb.checked = false;
+                    topCb.indeterminate = true;
+                }
+            }
+        });
+    }
     
     const countEl = document.getElementById('mass-selected-count');
     if (countEl) {
         countEl.textContent = `${totalCount} indicadores seleccionados`;
+    }
+    
+    // Manage warnings for favorites
+    const warningEl = document.getElementById('mass-favorites-warning');
+    if (warningEl) {
+        if (onlyFavorites && totalCount === 0) {
+            const list = JSON.parse(localStorage.getItem('favorite_indicators') || '[]');
+            if (list.length === 0) {
+                warningEl.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> No tienes ningún indicador guardado. Agrega favoritos en el explorador de la izquierda antes de exportar.';
+            } else {
+                const details = list.map(item => `• [ID: ${item.id}] ${item.name || 'Sin nombre'}`).join('<br>');
+                warningEl.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> No tienes indicadores guardados dentro de las categorías seleccionadas.<br><div style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 0.4rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 0.4rem; text-align: left; line-height: 1.4;"><strong>Guardados en el navegador:</strong><br>${details}</div>`;
+            }
+            warningEl.style.display = 'block';
+        } else {
+            warningEl.style.display = 'none';
+        }
     }
     
     const showBtn = document.getElementById('btn-mass-show');
@@ -4414,8 +4885,12 @@ function updateMassSelectedCount() {
 }
 
 function selectAllMassCategories(checked) {
-    document.querySelectorAll('.mass-category-checkbox').forEach(cb => {
+    document.querySelectorAll('.mass-subcat-checkbox').forEach(cb => {
         cb.checked = checked;
+    });
+    document.querySelectorAll('.mass-topcat-checkbox').forEach(cb => {
+        cb.checked = checked;
+        cb.indeterminate = false;
     });
     updateMassSelectedCount();
 }
@@ -4432,11 +4907,19 @@ async function startMassQuery(mode) {
     document.getElementById('mass-progress-panel').style.display = 'block';
     document.getElementById('mass-results-card').style.display = 'none';
     
+    const onlyFavorites = document.getElementById('mass-only-favorites')?.checked;
+    
     // Gather all selected indicators
     const indicatorsToFetch = [];
     massState.flatIndicators.forEach(ind => {
-        if (massState.selectedCategories.has(ind.topCategory)) {
-            indicatorsToFetch.push(ind);
+        const parts = ind.categoryPath ? ind.categoryPath.split(' / ') : [];
+        const topCat = parts[0] || 'General';
+        const subCat = parts[1] || 'General';
+        const key = `${topCat} - ${subCat}`;
+        if (massState.selectedSubcategories.has(key)) {
+            if (!onlyFavorites || isIndicatorFavorite(ind.id)) {
+                indicatorsToFetch.push(ind);
+            }
         }
     });
     
@@ -4848,6 +5331,9 @@ function initCreadorSection() {
         appState.customChartInstance.destroy();
         appState.customChartInstance = null;
     }
+    
+    // Load saved custom indicators from local database
+    loadSavedIndicators();
 }
 
 async function validateAndFetchIndicatorName(index) {
@@ -5222,6 +5708,30 @@ async function generateSyntheticIndicator() {
         progressPanel.style.display = 'none';
         resultsArea.style.display = 'flex';
         
+        // Populate Formula Card details
+        const resultTitleEl = document.getElementById('creator-result-title');
+        const resultFormulaEl = document.getElementById('creator-result-formula');
+        const resultScaleEl = document.getElementById('creator-result-scale-badge');
+        
+        if (resultTitleEl && resultFormulaEl && resultScaleEl) {
+            resultTitleEl.textContent = customName;
+            
+            const formulaParts = [];
+            indicators.forEach(ind => {
+                const nameEl = document.getElementById(`creator-ind-${ind.index}-name`);
+                const cleanName = nameEl && nameEl.dataset.verified === "true" ? nameEl.dataset.cleanName : `Indicador #${ind.id}`;
+                formulaParts.push(`<span style="color: var(--accent-blue); font-weight: 600;">[${ind.id}]</span> ${escapeHtml(cleanName)}`);
+            });
+            const opSymbol = getOpSymbol(op);
+            let formulaHtml = formulaParts.join(` <strong style="color: var(--text-primary); font-size: 1.1rem; margin: 0 0.25rem;">${opSymbol}</strong> `);
+            if (scale !== 1) {
+                formulaHtml = `(${formulaHtml}) <strong style="color: var(--text-primary); font-size: 1.1rem; margin: 0 0.25rem;">×</strong> ${scale}`;
+            }
+            
+            resultFormulaEl.innerHTML = formulaHtml;
+            resultScaleEl.innerHTML = `Escala: <span style="color: var(--text-primary);">x${scale}</span> ${resolvedUnit ? `(${resolvedUnit})` : ''}`;
+        }
+        
         // 1. Populate KPI Cards
         const lastRec = appState.customIndicatorResults[appState.customIndicatorResults.length - 1];
         
@@ -5402,4 +5912,658 @@ function exportCustomToCSV() {
         }
     }
 }
+
+// ==========================================
+// 21b. PERSISTENCIA EN LOCALSTORAGE (BASE DE DATOS LOCAL)
+// ==========================================
+
+function saveCustomIndicatorToDB() {
+    if (!appState.customIndicatorResults || appState.customIndicatorResults.length === 0) {
+        alert('Debes generar el indicador sintético primero antes de guardarlo.');
+        return;
+    }
+    
+    const rows = document.querySelectorAll('.creator-indicator-row');
+    const indicatorList = [];
+    
+    for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const idx = row.id.replace('creator-indicator-row-', '');
+        const idStr = document.getElementById(`creator-ind-${idx}-id`).value.trim();
+        const nameEl = document.getElementById(`creator-ind-${idx}-name`);
+        const cleanName = nameEl && nameEl.dataset.verified === "true" ? nameEl.dataset.cleanName : `Indicador #${idStr}`;
+        const unit = nameEl && nameEl.dataset.verified === "true" ? nameEl.dataset.unit : '';
+        
+        indicatorList.push({
+            id: parseInt(idStr),
+            name: cleanName,
+            unit: unit
+        });
+    }
+    
+    const customName = document.getElementById('creator-custom-name').value.trim() || 'Indicador Sintético';
+    const customUnit = document.getElementById('creator-custom-unit').value.trim() || '';
+    const op = document.getElementById('creator-operator').value;
+    const scale = parseFloat(document.getElementById('creator-scale').value) || 1;
+    
+    const record = {
+        id: Date.now(), // Unique ID
+        name: customName,
+        unit: customUnit,
+        operator: op,
+        scale: scale,
+        indicators: indicatorList
+    };
+    
+    try {
+        let saved = localStorage.getItem('cepalstat_saved_indicators');
+        let list = saved ? JSON.parse(saved) : [];
+        
+        // Prevent duplicate names
+        const duplicateIdx = list.findIndex(item => item.name.toLowerCase() === customName.toLowerCase());
+        if (duplicateIdx !== -1) {
+            if (!confirm('Ya existe un indicador guardado con este nombre. ¿Deseas reemplazarlo?')) {
+                return;
+            }
+            list[duplicateIdx] = record;
+        } else {
+            list.push(record);
+        }
+        
+        localStorage.setItem('cepalstat_saved_indicators', JSON.stringify(list));
+        alert('¡Indicador guardado exitosamente en la base de datos local!');
+        loadSavedIndicators();
+    } catch (err) {
+        alert(`Error al guardar en base de datos: ${err.message}`);
+        console.error(err);
+    }
+}
+
+function loadSavedIndicators() {
+    const listEl = document.getElementById('creator-saved-list');
+    if (!listEl) return;
+    
+    listEl.innerHTML = '';
+    
+    try {
+        const saved = localStorage.getItem('cepalstat_saved_indicators');
+        const list = saved ? JSON.parse(saved) : [];
+        
+        if (list.length === 0) {
+            listEl.innerHTML = `
+                <div style="text-align: center; color: var(--text-muted); font-size: 0.85rem; padding: 2.5rem 0;">
+                    <i class="fa-solid fa-folder-open" style="font-size: 1.5rem; margin-bottom: 0.5rem; display: block; opacity: 0.5;"></i>
+                    No hay indicadores guardados.
+                </div>
+            `;
+            return;
+        }
+        
+        list.forEach(item => {
+            const row = document.createElement('div');
+            row.style.background = 'rgba(255, 255, 255, 0.01)';
+            row.style.border = '1px solid var(--border-color)';
+            row.style.borderRadius = '8px';
+            row.style.padding = '0.75rem';
+            row.style.display = 'flex';
+            row.style.justifyContent = 'space-between';
+            row.style.alignItems = 'center';
+            row.style.gap = '0.5rem';
+            row.style.transition = 'var(--transition-smooth)';
+            row.style.cursor = 'pointer';
+            
+            row.className = 'saved-indicator-item';
+            
+            const codes = item.indicators.map(ind => ind.id).join(` ${getOpSymbol(item.operator)} `);
+            
+            row.innerHTML = `
+                <div style="flex: 1; text-align: left;" onclick="loadSavedIndicatorToForm(${item.id})">
+                    <strong style="font-size: 0.85rem; color: var(--text-primary); display: block; margin-bottom: 0.15rem;">${item.name}</strong>
+                    <span style="font-size: 0.72rem; color: var(--text-muted); display: block;">Fórmula: ${codes} (${item.unit || 'sin unidad'})</span>
+                </div>
+                <button type="button" class="btn-danger-icon" onclick="deleteSavedIndicator(${item.id})" style="background: transparent; border: none; color: var(--accent-red); cursor: pointer; padding: 0.25rem; font-size: 0.85rem;" title="Eliminar de la BD">
+                    <i class="fa-solid fa-trash-can"></i>
+                </button>
+            `;
+            
+            listEl.appendChild(row);
+        });
+    } catch (err) {
+        console.error('Error al cargar indicadores guardados:', err);
+    }
+}
+
+function getOpSymbol(op) {
+    if (op === 'add') return '+';
+    if (op === 'subtract') return '-';
+    if (op === 'multiply') return '×';
+    if (op === 'divide') return '÷';
+    return '?';
+}
+
+function deleteSavedIndicator(id) {
+    event.stopPropagation();
+    
+    if (!confirm('¿Estás seguro de que deseas eliminar este indicador de la base de datos local?')) {
+        return;
+    }
+    
+    try {
+        const saved = localStorage.getItem('cepalstat_saved_indicators');
+        let list = saved ? JSON.parse(saved) : [];
+        list = list.filter(item => item.id !== id);
+        localStorage.setItem('cepalstat_saved_indicators', JSON.stringify(list));
+        loadSavedIndicators();
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+async function loadSavedIndicatorToForm(id) {
+    try {
+        const saved = localStorage.getItem('cepalstat_saved_indicators');
+        const list = saved ? JSON.parse(saved) : [];
+        const record = list.find(item => item.id === id);
+        if (!record) return;
+        
+        const container = document.getElementById('creator-indicators-list');
+        if (container) {
+            container.innerHTML = '';
+        }
+        creatorIndicatorCount = 0;
+        
+        for (let i = 0; i < record.indicators.length; i++) {
+            const ind = record.indicators[i];
+            addIndicatorInputRow(ind.id);
+            
+            const nameEl = document.getElementById(`creator-ind-${i+1}-name`);
+            if (nameEl) {
+                nameEl.textContent = `✓ [${ind.id}] ${ind.name}`;
+                nameEl.style.color = 'var(--accent-green)';
+                nameEl.dataset.verified = "true";
+                nameEl.dataset.cleanName = ind.name;
+                nameEl.dataset.unit = ind.unit || '';
+            }
+        }
+        
+        document.getElementById('creator-operator').value = record.operator;
+        document.getElementById('creator-scale').value = record.scale;
+        document.getElementById('creator-custom-name').value = record.name;
+        document.getElementById('creator-custom-unit').value = record.unit;
+        
+        await generateSyntheticIndicator();
+    } catch (err) {
+        alert(`Error al cargar el indicador: ${err.message}`);
+        console.error(err);
+    }
+}
+
+// ============================================================================
+// COMPONENTE 3: CONSULTA INTELIGENTE (PROMPT AI & AUTOCOMPLETE EN LENGUAJE NATURAL)
+// ============================================================================
+
+// Global function to load a suggested prompt from template click
+function loadSuggestedPrompt(text) {
+    const inputEl = document.getElementById('consulta-prompt-input');
+    if (inputEl) {
+        inputEl.value = text;
+        inputEl.focus();
+        // Trigger input event to update autocomplete if relevant
+        inputEl.dispatchEvent(new Event('input'));
+    }
+}
+
+// Clear chat history
+function clearConsultaChat() {
+    const container = document.getElementById('consulta-chat-container');
+    if (container) {
+        container.innerHTML = `
+            <div class="chat-bubble-assistant">
+                <div style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #a855f7 0%, #7e22ce 100%); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #fff; font-size: 0.85rem;">
+                    <i class="fa-solid fa-robot"></i>
+                </div>
+                <div>
+                    <h4 style="margin: 0 0 0.25rem 0; font-size: 0.9rem; color: #a855f7; font-weight: 600;">Asistente de Consulta</h4>
+                    <p style="margin: 0; font-size: 0.875rem; color: var(--text-secondary);">
+                        Chat limpiado. ¿Qué indicador o cálculo deseas explorar hoy?
+                    </p>
+                </div>
+            </div>
+        `;
+    }
+}
+
+// Append a message bubble to the chat container
+function appendConsultaChatMessage(sender, text, htmlContent = null) {
+    const container = document.getElementById('consulta-chat-container');
+    if (!container) return;
+
+    const bubble = document.createElement('div');
+    if (sender === 'user') {
+        bubble.className = 'chat-bubble-user';
+        bubble.innerHTML = `
+            <div style="flex: 1;">
+                <h4 style="margin: 0 0 0.25rem 0; font-size: 0.9rem; color: var(--accent-blue); font-weight: 600; text-align: right;">Usuario</h4>
+                <p style="margin: 0; font-size: 0.875rem; color: var(--text-primary); text-align: right;">${escapeHtml(text)}</p>
+            </div>
+            <div style="width: 32px; height: 32px; border-radius: 50%; background: rgba(59, 130, 246, 0.2); border: 1px solid var(--accent-blue); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--accent-blue); font-size: 0.85rem;">
+                <i class="fa-solid fa-user"></i>
+            </div>
+        `;
+    } else {
+        bubble.className = 'chat-bubble-assistant';
+        bubble.innerHTML = `
+            <div style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #a855f7 0%, #7e22ce 100%); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #fff; font-size: 0.85rem;">
+                <i class="fa-solid fa-robot"></i>
+            </div>
+            <div style="flex: 1;">
+                <h4 style="margin: 0 0 0.25rem 0; font-size: 0.9rem; color: #a855f7; font-weight: 600;">Asistente de Consulta</h4>
+                <div style="font-size: 0.875rem; color: var(--text-secondary); line-height: 1.5;">
+                    ${htmlContent ? htmlContent : `<p style="margin: 0;">${escapeHtml(text)}</p>`}
+                </div>
+            </div>
+        `;
+    }
+
+    container.appendChild(bubble);
+    // Smooth scroll to bottom
+    container.scrollTo({
+        top: container.scrollHeight,
+        behavior: 'smooth'
+    });
+}
+
+// Escape HTML utility
+function escapeHtml(str) {
+    return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+}
+
+// Setup real-time autocomplete suggestions dropdown
+function setupConsultaAutocomplete() {
+    const inputEl = document.getElementById('consulta-prompt-input');
+    const dropdownEl = document.getElementById('consulta-autocomplete-dropdown');
+    if (!inputEl || !dropdownEl) return;
+
+    // Remove previous listeners to avoid duplicates
+    inputEl.oninput = null;
+    inputEl.onkeydown = null;
+
+    inputEl.addEventListener('input', (e) => {
+        const query = e.target.value.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        if (query.length < 2) {
+            dropdownEl.style.display = 'none';
+            return;
+        }
+
+        // Get matching official indicators
+        let matches = [];
+        if (appState.flatIndicators) {
+            matches = appState.flatIndicators.filter(ind => {
+                const nameClean = ind.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                const idClean = ind.id.toString();
+                return nameClean.includes(query) || idClean.includes(query);
+            });
+        }
+
+        // Get matching saved custom indicators
+        let customMatches = [];
+        try {
+            const saved = localStorage.getItem('cepalstat_saved_indicators');
+            const list = saved ? JSON.parse(saved) : [];
+            customMatches = list.filter(item => {
+                const nameClean = item.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                return nameClean.includes(query);
+            });
+        } catch (err) {
+            console.error('Error matching custom indicators:', err);
+        }
+
+        // Merge matches (limit to 6 total matches for clean view)
+        dropdownEl.innerHTML = '';
+        const totalMatchesCount = matches.length + customMatches.length;
+
+        if (totalMatchesCount === 0) {
+            dropdownEl.innerHTML = `
+                <div style="padding: 0.75rem 1rem; color: var(--text-muted); font-size: 0.85rem;">
+                    No se encontraron indicadores que coincidan.
+                </div>
+            `;
+            dropdownEl.style.display = 'block';
+            return;
+        }
+
+        // Render custom indicators matches
+        customMatches.forEach(item => {
+            const itemEl = document.createElement('div');
+            itemEl.className = 'consulta-autocomplete-item';
+            itemEl.innerHTML = `
+                <span style="font-weight: 600; color: var(--accent-green);"><i class="fa-solid fa-database" style="margin-right: 0.35rem; font-size: 0.75rem;"></i> ${item.name}</span>
+                <span class="indicator-code" style="color: var(--accent-green); background: rgba(16, 185, 129, 0.15);">Sintético BD</span>
+            `;
+            itemEl.addEventListener('click', () => {
+                inputEl.value = `Indicador sintético "${item.name}"`;
+                dropdownEl.style.display = 'none';
+                inputEl.dataset.selectedCustomId = item.id;
+                inputEl.focus();
+            });
+            dropdownEl.appendChild(itemEl);
+        });
+
+        // Render official indicators matches
+        matches.slice(0, 6 - customMatches.length).forEach(ind => {
+            const itemEl = document.createElement('div');
+            itemEl.className = 'consulta-autocomplete-item';
+            itemEl.innerHTML = `
+                <span>${ind.name}</span>
+                <span class="indicator-code">${ind.id}</span>
+            `;
+            itemEl.addEventListener('click', () => {
+                // Replace or append
+                const text = inputEl.value;
+                const lastWordMatch = text.match(/\b\w+$/);
+                if (lastWordMatch) {
+                    inputEl.value = text.substring(0, lastWordMatch.index) + ind.id + ' ';
+                } else {
+                    inputEl.value = `Graficar indicador ${ind.id} (${ind.name})`;
+                }
+                dropdownEl.style.display = 'none';
+                inputEl.focus();
+            });
+            dropdownEl.appendChild(itemEl);
+        });
+
+        dropdownEl.style.display = 'block';
+    });
+
+    inputEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            submitNaturalLanguageQuery();
+        }
+    });
+
+    // Close dropdown on click outside
+    document.addEventListener('click', (e) => {
+        if (e.target !== inputEl && e.target !== dropdownEl && !dropdownEl.contains(e.target)) {
+            dropdownEl.style.display = 'none';
+        }
+    });
+}
+
+// Submit prompt query
+function submitNaturalLanguageQuery() {
+    const inputEl = document.getElementById('consulta-prompt-input');
+    if (!inputEl) return;
+    const promptText = inputEl.value.trim();
+    if (!promptText) return;
+
+    // Add user message to chat
+    appendConsultaChatMessage('user', promptText);
+    inputEl.value = '';
+
+    // Hide autocomplete dropdown
+    const dropdownEl = document.getElementById('consulta-autocomplete-dropdown');
+    if (dropdownEl) dropdownEl.style.display = 'none';
+
+    // Process parser with a slight delay for realistic feeling
+    setTimeout(() => {
+        processQuery(promptText);
+    }, 450);
+}
+
+// Main processing logic for the NLP queries
+function processQuery(promptText) {
+    const text = promptText.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+    // 1. Check for specific custom indicator ID selection from dataset
+    const inputEl = document.getElementById('consulta-prompt-input');
+    if (inputEl && inputEl.dataset.selectedCustomId) {
+        const customId = parseInt(inputEl.dataset.selectedCustomId);
+        delete inputEl.dataset.selectedCustomId; // consume it
+
+        try {
+            const saved = localStorage.getItem('cepalstat_saved_indicators');
+            const list = saved ? JSON.parse(saved) : [];
+            const record = list.find(item => item.id === customId);
+            if (record) {
+                appendConsultaChatMessage('assistant', '', `<p>¡Claro! He encontrado tu indicador sintético guardado: <strong>${record.name}</strong>.</p>
+                <p>Voy a redirigirte al Creador de Indicadores, configurar la fórmula y generar el gráfico correspondiente de inmediato.</p>`);
+                
+                setTimeout(() => {
+                    loadSavedIndicatorToForm(customId);
+                    selectCreadorSection();
+                }, 1000);
+                return;
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    // 2. Parse potential indicator IDs (2 to 5 digit integers)
+    const numbers = promptText.match(/\b\d{2,5}\b/g) || [];
+    const validIds = [];
+    
+    // Validate numbers against official flatIndicators database
+    if (appState.flatIndicators) {
+        numbers.forEach(numStr => {
+            const id = parseInt(numStr);
+            if (appState.flatIndicators.some(ind => ind.id === id) && !validIds.includes(id)) {
+                validIds.push(id);
+            }
+        });
+    }
+
+    // 3. Check for arithmetic operation commands: division, multiplication, sum, subtraction
+    const isDivision = /\b(dividir|division|cociente|entre|sobre|\/)\b/.test(text);
+    const isMultiplication = /\b(multiplicar|multiplicacion|por|producto|\*)\b/.test(text) && !/\b(por\s+100|por\s+cien)\b/.test(text);
+    const isSum = /\b(sumar|suma|mas|adicion|\+)\b/.test(text);
+    const isSubtraction = /\b(restar|resta|menos|diferencia|-)\b/.test(text);
+    
+    const isMathOperation = isDivision || isMultiplication || isSum || isSubtraction;
+
+    // Parse scaling factors mentioned in the query
+    let scale = 1;
+    if (/\b(100|porcentaje|por\s+cien|por\s+100)\b/.test(text)) {
+        scale = 100;
+    } else if (/\b(1000|1\.000|mil|por\s+mil)\b/.test(text)) {
+        scale = 1000;
+    } else if (/\b(100000|100\.000|cien\s+mil)\b/.test(text)) {
+        scale = 100000;
+    }
+
+    // A. MATH CALCULATION INTENT (COMBINING TWO OR MORE VALID INDICATORS)
+    if (isMathOperation && validIds.length >= 2) {
+        let op = 'divide';
+        let opSymbol = '÷';
+        let opWord = 'división';
+
+        if (isSum) {
+            op = 'add';
+            opSymbol = '+';
+            opWord = 'suma';
+        } else if (isSubtraction) {
+            op = 'subtract';
+            opSymbol = '-';
+            opWord = 'resta';
+        } else if (isMultiplication) {
+            op = 'multiply';
+            opSymbol = '×';
+            opWord = 'multiplicación';
+        }
+
+        const ind1 = findIndicatorById(validIds[0]);
+        const ind2 = findIndicatorById(validIds[1]);
+        const customIndicatorName = `Cálculo: [${ind1.id}] ${ind1.name.substring(0, 20)}... ${opSymbol} [${ind2.id}] ${ind2.name.substring(0, 20)}...`;
+
+        appendConsultaChatMessage('assistant', '', `
+            <p>He detectado una intención de <strong>combinación sintética</strong>:</p>
+            <ul style="margin: 0.25rem 0 0.75rem 1rem; padding: 0;">
+                <li><strong>Indicador A:</strong> [${ind1.id}] ${ind1.name}</li>
+                <li><strong>Operador:</strong> ${opWord} (${opSymbol})</li>
+                <li><strong>Indicador B:</strong> [${ind2.id}] ${ind2.name}</li>
+                <li><strong>Escala:</strong> ${scale}</li>
+            </ul>
+            <p>Configurando automáticamente el formulario del <strong>Creador de Indicadores</strong> y ejecutando el cálculo para ti...</p>
+        `);
+
+        // Switch and configure creator form
+        setTimeout(() => {
+            selectCreadorSection();
+            const container = document.getElementById('creator-indicators-list');
+            if (container) container.innerHTML = '';
+            creatorIndicatorCount = 0;
+
+            // Load indicator inputs
+            addIndicatorInputRow(ind1.id);
+            addIndicatorInputRow(ind2.id);
+
+            // Populate metadata
+            const nameEl1 = document.getElementById('creator-ind-1-name');
+            if (nameEl1) {
+                nameEl1.textContent = `✓ [${ind1.id}] ${ind1.name}`;
+                nameEl1.style.color = 'var(--accent-green)';
+                nameEl1.dataset.verified = "true";
+                nameEl1.dataset.cleanName = ind1.name;
+                nameEl1.dataset.unit = '';
+            }
+
+            const nameEl2 = document.getElementById('creator-ind-2-name');
+            if (nameEl2) {
+                nameEl2.textContent = `✓ [${ind2.id}] ${ind2.name}`;
+                nameEl2.style.color = 'var(--accent-green)';
+                nameEl2.dataset.verified = "true";
+                nameEl2.dataset.cleanName = ind2.name;
+                nameEl2.dataset.unit = '';
+            }
+
+            document.getElementById('creator-operator').value = op;
+            document.getElementById('creator-scale').value = scale;
+            document.getElementById('creator-custom-name').value = customIndicatorName;
+            document.getElementById('creator-custom-unit').value = scale === 100 ? '%' : 'sintético';
+
+            // Generate synthetic data
+            generateSyntheticIndicator();
+        }, 1200);
+        return;
+    }
+
+    // B. SINGLE INDICATOR GRAPH/EXPLORE INTENT (VALID ID FOUND)
+    if (validIds.length === 1) {
+        const ind = findIndicatorById(validIds[0]);
+        appendConsultaChatMessage('assistant', '', `
+            <p>He localizado el indicador solicitado en la base de datos oficial:</p>
+            <p><strong>[${ind.id}] ${ind.name}</strong></p>
+            <p>Cargando el gráfico y redireccionándote al <strong>Explorador de Indicadores</strong>...</p>
+        `);
+
+        setTimeout(() => {
+            selectIndicator(ind);
+            switchGlobalSection('explorer');
+        }, 1200);
+        return;
+    }
+
+    // C. SEARCH BY KEYWORD (NO VALID ID FOUND BUT KEYWORDS EXIST)
+    // Filter indicators matching user keywords
+    const keywords = text.replace(/\b(graficar|ver|buscar|mostrar|visualizar|deseo|quiero|indicador|indicadores|de|para|el|la|los|las|un|una)\b/g, '').trim();
+    
+    if (keywords.length >= 3) {
+        let matches = [];
+        if (appState.flatIndicators) {
+            matches = appState.flatIndicators.filter(ind => {
+                const nameClean = ind.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                return nameClean.includes(keywords);
+            });
+        }
+
+        // Also check if any saved indicator matches
+        let customMatches = [];
+        try {
+            const saved = localStorage.getItem('cepalstat_saved_indicators');
+            const list = saved ? JSON.parse(saved) : [];
+            customMatches = list.filter(item => {
+                const nameClean = item.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                return nameClean.includes(keywords);
+            });
+        } catch (e) {}
+
+        if (matches.length > 0 || customMatches.length > 0) {
+            let matchesHtml = `<p>He encontrado los siguientes indicadores registrados que coinciden con "<strong>${escapeHtml(keywords)}</strong>":</p>`;
+            matchesHtml += `<div style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem;">`;
+
+            // Custom indicators matches first
+            customMatches.forEach(item => {
+                matchesHtml += `
+                    <button class="suggestion-prompt-card" onclick="loadSavedIndicatorToForm(${item.id}); selectCreadorSection();" style="border: 1px solid var(--accent-green); background: rgba(16, 185, 129, 0.05); padding: 0.6rem; border-radius: 6px; cursor: pointer; text-align: left; width: 100%; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-size: 0.825rem; font-weight: 600; color: var(--text-primary);"><i class="fa-solid fa-database" style="color: var(--accent-green); margin-right: 0.35rem;"></i> ${item.name}</span>
+                        <span style="font-size: 0.72rem; color: var(--accent-green); font-weight: bold; text-transform: uppercase;">Sintético BD</span>
+                    </button>
+                `;
+            });
+
+            // Official indicators matches
+            matches.slice(0, 5).forEach(ind => {
+                matchesHtml += `
+                    <button class="suggestion-prompt-card" onclick="selectIndicatorByIdFromPrompt(${ind.id})" style="border: 1px solid var(--border-color); background: rgba(255, 255, 255, 0.02); padding: 0.6rem; border-radius: 6px; cursor: pointer; text-align: left; width: 100%; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-size: 0.825rem; color: var(--text-primary);">${ind.name}</span>
+                        <span style="font-size: 0.72rem; color: var(--accent-blue); font-weight: bold; background: rgba(59, 130, 246, 0.1); padding: 0.15rem 0.35rem; border-radius: 4px; flex-shrink: 0; margin-left: 0.5rem;">[${ind.id}]</span>
+                    </button>
+                `;
+            });
+
+            matchesHtml += `</div>`;
+            appendConsultaChatMessage('assistant', '', matchesHtml);
+            return;
+        }
+    }
+
+    // D. SYSTEM EXPLANATIONS & GUIDES (BRECHAS, TENDENCIAS, METODOLOGÍA)
+    if (/\b(brecha|brechas|dre)\b/.test(text)) {
+        appendConsultaChatMessage('assistant', '', `
+            <p>El módulo de <strong>Brechas Críticas (DRE)</strong> analiza indicadores de desarrollo social, demografía y economía comparando de manera directa el promedio de América Latina con Colombia.</p>
+            <p>Puedes ir a esta sección para examinar la desigualdad de ingresos, tasa de analfabetismo y afiliación a pensiones en detalle.</p>
+            <button class="btn-primary" onclick="selectBrechasSection()" style="margin-top: 0.5rem; background: linear-gradient(135deg, var(--color-colombia) 0%, rgba(255,215,0,0.85) 100%); color: #0b0f19; font-size: 0.8rem; padding: 0.4rem 0.8rem; border-radius: 6px; border: none; cursor: pointer; font-weight: 600;">Ver Brechas Críticas</button>
+        `);
+        return;
+    }
+
+    if (/\b(tendencia|tendencias|preliminar|proyeccion|crecimiento)\b/.test(text)) {
+        appendConsultaChatMessage('assistant', '', `
+            <p>El módulo de <strong>Tendencias CEPAL 2025</strong> resume las conclusiones macroeconómicas oficiales sobre la desaceleración del crecimiento en la región, la moderación de la inflación y las proyecciones de inversión.</p>
+            <p>Puedes ir allí para ver las estadísticas vinculadas directamente a cada tendencia macroeconómica.</p>
+            <button class="btn-primary" onclick="selectTendenciasSection()" style="margin-top: 0.5rem; background: linear-gradient(135deg, var(--accent-blue) 0%, rgba(59,130,246,0.85) 100%); color: #0b0f19; font-size: 0.8rem; padding: 0.4rem 0.8rem; border-radius: 6px; border: none; cursor: pointer; font-weight: 600;">Ver Tendencias CEPAL</button>
+        `);
+        return;
+    }
+
+    if (/\b(crear|creador|combinar|sintetico|sinteticos|formula|guardar)\b/.test(text)) {
+        appendConsultaChatMessage('assistant', '', `
+            <p>En el <strong>Creador de Indicadores</strong> puedes ingresar códigos oficiales de la CEPAL (por ejemplo, 3341 para Pobreza y 4789 para Población) y sumarlos, restarlos, multiplicarlos o dividirlos para crear series personalizadas.</p>
+            <p>Además, puedes guardar tus fórmulas creadas pulsando el botón <strong>"Guardar en BD"</strong> para tenerlas disponibles de forma permanente.</p>
+            <button class="btn-primary" onclick="selectCreadorSection()" style="margin-top: 0.5rem; background: linear-gradient(135deg, var(--accent-blue) 0%, rgba(59,130,246,0.85) 100%); color: #0b0f19; font-size: 0.8rem; padding: 0.4rem 0.8rem; border-radius: 6px; border: none; cursor: pointer; font-weight: 600;">Ir al Creador de Indicadores</button>
+        `);
+        return;
+    }
+
+    // E. GENERAL UNUNDERSTOOD PROMPT
+    appendConsultaChatMessage('assistant', '', `
+        <p>No he podido identificar una acción automática para tu consulta. Para ayudarme a procesarla mejor, intenta incluir:</p>
+        <ul style="margin: 0.25rem 0 0.5rem 1rem; padding: 0;">
+            <li>El código numérico oficial (ej: <strong>3341</strong>, <strong>4789</strong>, etc.) del indicador.</li>
+            <li>Las palabras clave de acción, como <strong>"graficar"</strong>, <strong>"dividir"</strong> o <strong>"sumar"</strong>.</li>
+        </ul>
+        <p>También puedes ingresar una palabra clave descriptiva (como "inflación", "desempleo") para que busque sugerencias coincidentes en la base de datos.</p>
+    `);
+}
+
+// Handler helper to display indicator selected from chat match
+function selectIndicatorByIdFromPrompt(id) {
+    const ind = findIndicatorById(id);
+    if (ind) {
+        selectIndicator(ind);
+        switchGlobalSection('explorer');
+    }
+}
+
 
