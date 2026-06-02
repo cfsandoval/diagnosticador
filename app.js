@@ -3941,7 +3941,7 @@ function openXlsExportModal() {
             div.innerHTML = `
                 <label class="report-checkbox-item" style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
                     <div style="display: flex; align-items: center; gap: 0.65rem;">
-                        <input type="checkbox" class="xls-category-checkbox" value="${cat}" onchange="updateXlsSelectedCount()">
+                        <input type="checkbox" class="xls-category-checkbox" value="${cat}" checked autocomplete="off" onchange="updateXlsSelectedCount()">
                         <span>${cat}</span>
                     </div>
                     <span style="font-size: 0.75rem; color: var(--text-muted); background: rgba(255,255,255,0.03); padding: 0.15rem 0.45rem; border-radius: 4px;">${count} ind.</span>
@@ -4742,7 +4742,7 @@ function initExportarDatosSection() {
             headerDiv.style.cssText = 'display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 0.4rem;';
             headerDiv.innerHTML = `
                 <label style="display: flex; align-items: center; gap: 0.5rem; font-weight: 600; font-size: 0.875rem; color: var(--accent-blue); cursor: pointer; margin-bottom: 0;">
-                    <input type="checkbox" class="mass-topcat-checkbox" value="${topCat}" onchange="toggleTopCat('${topCat}', this.checked)">
+                    <input type="checkbox" class="mass-topcat-checkbox" value="${topCat}" checked autocomplete="off" onchange="toggleTopCat('${topCat}', this.checked)">
                     <span>${topCat}</span>
                 </label>
                 <span style="font-size: 0.72rem; color: var(--text-muted); background: rgba(255,255,255,0.03); padding: 0.1rem 0.35rem; border-radius: 4px;">${topCatCount} ind.</span>
@@ -4759,7 +4759,7 @@ function initExportarDatosSection() {
                 subLabel.style.cssText = 'display: flex; align-items: center; justify-content: space-between; font-size: 0.8125rem; cursor: pointer; color: var(--text-secondary); margin-bottom: 0;';
                 subLabel.innerHTML = `
                     <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <input type="checkbox" class="mass-subcat-checkbox" data-topcat="${topCat}" value="${subCat}" onchange="updateMassSelectedCount()">
+                        <input type="checkbox" class="mass-subcat-checkbox" data-topcat="${topCat}" value="${subCat}" checked autocomplete="off" onchange="updateMassSelectedCount()">
                         <span>${subCat}</span>
                     </div>
                     <span style="font-size: 0.7rem; color: var(--text-muted);">${count} ind.</span>
