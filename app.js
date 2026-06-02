@@ -21,7 +21,11 @@ let appState = {
     pyramidChartAlc: null,
     pyramidDataCache: {}, // Cache for all structural indicators to enable fast print report generation
     selectedReportType: 'executive',
-    activeTendenciaReport: 'balance_preliminar'
+    activeTendenciaReport: 'balance_preliminar',
+    
+    // Creador de Indicadores Sintéticos State
+    customChartInstance: null,
+    customIndicatorResults: []
 };
 
 // Constants for Standard Dimensions
@@ -1278,6 +1282,11 @@ function switchGlobalSection(sectionId) {
     if (exportarDatosSection) {
         exportarDatosSection.style.display = sectionId === 'exportar-datos' ? 'block' : 'none';
     }
+
+    const creadorSection = document.getElementById('creador-section');
+    if (creadorSection) {
+        creadorSection.style.display = sectionId === 'creador' ? 'block' : 'none';
+    }
     
     // Update sidebar brechas button active highlight
     const sidebarBrechasBtn = document.getElementById('sidebar-brechas-btn');
@@ -1302,6 +1311,11 @@ function switchGlobalSection(sectionId) {
     if (sidebarExportarBtn) {
         sidebarExportarBtn.classList.toggle('active', sectionId === 'exportar-datos');
     }
+
+    const sidebarCreadorBtn = document.getElementById('sidebar-creador-btn');
+    if (sidebarCreadorBtn) {
+        sidebarCreadorBtn.classList.toggle('active', sectionId === 'creador');
+    }
     
     // Auto load first indicator of structures if none is loaded yet
     if (sectionId === 'structures' && !appState.pyramidData) {
@@ -1316,7 +1330,7 @@ function selectBrechasSection() {
     // Clear selections in the thematic tree and structures
     document.querySelectorAll('.tree-leaf').forEach(el => el.classList.remove('selected'));
     document.querySelectorAll('.structures-list-item').forEach(el => {
-        if (el.id !== 'sidebar-brechas-btn' && el.id !== 'sidebar-metodologia-btn') {
+        if (el.id !== 'sidebar-brechas-btn' && el.id !== 'sidebar-metodologia-btn' && el.id !== 'sidebar-tendencias-btn' && el.id !== 'sidebar-exportar-datos-btn' && el.id !== 'sidebar-creador-btn') {
             el.classList.remove('active');
         }
     });
@@ -1331,7 +1345,7 @@ function selectMetodologiaSection() {
     // Clear selections in the thematic tree and structures
     document.querySelectorAll('.tree-leaf').forEach(el => el.classList.remove('selected'));
     document.querySelectorAll('.structures-list-item').forEach(el => {
-        if (el.id !== 'sidebar-metodologia-btn' && el.id !== 'sidebar-brechas-btn' && el.id !== 'sidebar-tendencias-btn' && el.id !== 'sidebar-exportar-datos-btn') {
+        if (el.id !== 'sidebar-metodologia-btn' && el.id !== 'sidebar-brechas-btn' && el.id !== 'sidebar-tendencias-btn' && el.id !== 'sidebar-exportar-datos-btn' && el.id !== 'sidebar-creador-btn') {
             el.classList.remove('active');
         }
     });
@@ -1344,7 +1358,7 @@ function selectTendenciasSection() {
     // Clear selections in the thematic tree and structures
     document.querySelectorAll('.tree-leaf').forEach(el => el.classList.remove('selected'));
     document.querySelectorAll('.structures-list-item').forEach(el => {
-        if (el.id !== 'sidebar-tendencias-btn' && el.id !== 'sidebar-brechas-btn' && el.id !== 'sidebar-metodologia-btn' && el.id !== 'sidebar-exportar-datos-btn') {
+        if (el.id !== 'sidebar-tendencias-btn' && el.id !== 'sidebar-brechas-btn' && el.id !== 'sidebar-metodologia-btn' && el.id !== 'sidebar-exportar-datos-btn' && el.id !== 'sidebar-creador-btn') {
             el.classList.remove('active');
         }
     });
@@ -1359,12 +1373,27 @@ function selectExportarDatosSection() {
     // Clear selections in the thematic tree and structures
     document.querySelectorAll('.tree-leaf').forEach(el => el.classList.remove('selected'));
     document.querySelectorAll('.structures-list-item').forEach(el => {
-        if (el.id !== 'sidebar-exportar-datos-btn' && el.id !== 'sidebar-brechas-btn' && el.id !== 'sidebar-metodologia-btn' && el.id !== 'sidebar-tendencias-btn') {
+        if (el.id !== 'sidebar-exportar-datos-btn' && el.id !== 'sidebar-brechas-btn' && el.id !== 'sidebar-metodologia-btn' && el.id !== 'sidebar-tendencias-btn' && el.id !== 'sidebar-creador-btn') {
             el.classList.remove('active');
         }
     });
     
     initExportarDatosSection();
+}
+
+// 11f. Click handler for sidebar Creador section
+function selectCreadorSection() {
+    switchGlobalSection('creador');
+    
+    // Clear selections in the thematic tree and structures
+    document.querySelectorAll('.tree-leaf').forEach(el => el.classList.remove('selected'));
+    document.querySelectorAll('.structures-list-item').forEach(el => {
+        if (el.id !== 'sidebar-creador-btn' && el.id !== 'sidebar-exportar-datos-btn' && el.id !== 'sidebar-brechas-btn' && el.id !== 'sidebar-metodologia-btn' && el.id !== 'sidebar-tendencias-btn') {
+            el.classList.remove('active');
+        }
+    });
+    
+    initCreadorSection();
 }
 
 // 12. Initialize Sidebar for Structures
@@ -4707,6 +4736,665 @@ function exportMassTableToCSV() {
             const url = URL.createObjectURL(blob);
             link.setAttribute('href', url);
             link.setAttribute('download', filename);
+            link.style.visibility = 'hidden';
+            }
+    }
+}
+
+// ==========================================
+// 21. CREADOR DE INDICADORES SINTÉTICOS
+// ==========================================
+
+let creatorIndicatorCount = 0;
+
+function addIndicatorInputRow(initialVal = '') {
+    const container = document.getElementById('creator-indicators-list');
+    if (!container) return;
+    
+    creatorIndicatorCount++;
+    const idx = creatorIndicatorCount;
+    
+    const row = document.createElement('div');
+    row.className = 'creator-indicator-row';
+    row.id = `creator-indicator-row-${idx}`;
+    row.style.display = 'flex';
+    row.style.flexDirection = 'column';
+    row.style.gap = '0.5rem';
+    row.style.padding = '1rem';
+    row.style.borderRadius = '8px';
+    row.style.background = 'rgba(255, 255, 255, 0.02)';
+    row.style.border = '1px solid var(--border-color)';
+    
+    // Label depending on position
+    let labelText = `Indicador #${idx}`;
+    if (idx === 1) labelText = 'Indicador A (Base)';
+    else if (idx === 2) labelText = 'Indicador B';
+    else if (idx === 3) labelText = 'Indicador C';
+    
+    // Show remove button for 3rd or subsequent indicators
+    const showRemove = idx > 2;
+    
+    row.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <label class="filter-label" style="font-weight: 600; margin-bottom: 0; color: var(--text-secondary);">${labelText}</label>
+            ${showRemove ? `
+                <button type="button" class="btn-danger-icon" onclick="removeIndicatorInputRow(${idx})" style="background: transparent; border: none; color: var(--accent-red); cursor: pointer; padding: 0.2rem; font-size: 0.95rem; transition: var(--transition-smooth);" title="Eliminar este indicador">
+                    <i class="fa-solid fa-trash-can"></i>
+                </button>
+            ` : ''}
+        </div>
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <input type="number" id="creator-ind-${idx}-id" class="search-input creator-ind-code-input" value="${initialVal}" placeholder="Código CEPAL (ej: 4789)" style="padding: 0.6rem 1rem; border-radius: 8px; font-weight: 600; flex: 1;">
+            <button type="button" class="btn-primary" onclick="validateAndFetchIndicatorName(${idx})" style="padding: 0.6rem 1.2rem; border-radius: 8px; flex-shrink: 0; display: flex; align-items: center; gap: 0.35rem;">
+                <i class="fa-solid fa-magnifying-glass"></i> Buscar
+            </button>
+        </div>
+        <span id="creator-ind-${idx}-name" class="creator-ind-name-label" style="font-size: 0.75rem; color: var(--text-muted); line-height: 1.3;">Ingrese código y busque para validar.</span>
+    `;
+    
+    container.appendChild(row);
+    
+    // Attach change listener to reset validation status on change
+    const inputEl = document.getElementById(`creator-ind-${idx}-id`);
+    if (inputEl) {
+        inputEl.addEventListener('change', () => {
+            const nameEl = document.getElementById(`creator-ind-${idx}-name`);
+            nameEl.textContent = 'Ingrese código y busque para validar.';
+            nameEl.style.color = 'var(--text-muted)';
+            nameEl.dataset.verified = "false";
+        });
+    }
+}
+
+function removeIndicatorInputRow(idx) {
+    const row = document.getElementById(`creator-indicator-row-${idx}`);
+    if (row) {
+        row.remove();
+        suggestCustomName();
+    }
+}
+
+function initCreadorSection() {
+    const container = document.getElementById('creator-indicators-list');
+    if (container) {
+        container.innerHTML = '';
+    }
+    creatorIndicatorCount = 0;
+    
+    // Add the first two default indicator rows
+    addIndicatorInputRow();
+    addIndicatorInputRow();
+    
+    // Reset operators/scale/names
+    document.getElementById('creator-operator').value = 'add';
+    document.getElementById('creator-scale').value = '1';
+    document.getElementById('creator-custom-name').value = '';
+    document.getElementById('creator-custom-unit').value = '';
+    
+    // Bind operator change event to auto name suggestion
+    const opSelect = document.getElementById('creator-operator');
+    if (opSelect) {
+        opSelect.removeEventListener('change', suggestCustomName);
+        opSelect.addEventListener('change', suggestCustomName);
+    }
+    
+    // Hide panels
+    document.getElementById('creator-progress-panel').style.display = 'none';
+    document.getElementById('creator-results-area').style.display = 'none';
+    
+    // Clear state
+    appState.customIndicatorResults = [];
+    if (appState.customChartInstance) {
+        appState.customChartInstance.destroy();
+        appState.customChartInstance = null;
+    }
+}
+
+async function validateAndFetchIndicatorName(index) {
+    const inputId = `creator-ind-${index}-id`;
+    const nameId = `creator-ind-${index}-name`;
+    
+    const valStr = document.getElementById(inputId).value.trim();
+    const nameEl = document.getElementById(nameId);
+    if (!nameEl) return;
+    
+    if (!valStr) {
+        nameEl.textContent = 'Ingrese un código válido.';
+        nameEl.style.color = 'var(--accent-red)';
+        nameEl.dataset.verified = "false";
+        return;
+    }
+    
+    const id = parseInt(valStr);
+    if (isNaN(id)) {
+        nameEl.textContent = 'El código debe ser un número.';
+        nameEl.style.color = 'var(--accent-red)';
+        nameEl.dataset.verified = "false";
+        return;
+    }
+    
+    nameEl.textContent = 'Validando e identificando...';
+    nameEl.style.color = 'var(--text-muted)';
+    
+    // 1. Try local cache lookup
+    if (appState.flatIndicators && appState.flatIndicators.length > 0) {
+        const localMatch = appState.flatIndicators.find(item => item.id === id);
+        if (localMatch) {
+            nameEl.textContent = `✓ [${localMatch.id}] ${localMatch.name}`;
+            nameEl.style.color = 'var(--accent-green)';
+            nameEl.dataset.verified = "true";
+            nameEl.dataset.cleanName = localMatch.name;
+            nameEl.dataset.unit = localMatch.unit || '';
+            
+            suggestCustomName();
+            return;
+        }
+    }
+    
+    // 2. Fallback to CEPAL API
+    try {
+        const url = `${API_DATA_BASE}/${id}/data?lang=es&members=${COLOMBIA_MEMBER_ID}`;
+        const response = await fetch(url);
+        if (response.ok) {
+            const res = await response.json();
+            const metadata = res.body.metadata || {};
+            const name = metadata.name || metadata.description || `Indicador #${id}`;
+            nameEl.textContent = `✓ [${id}] ${name}`;
+            nameEl.style.color = 'var(--accent-green)';
+            nameEl.dataset.verified = "true";
+            nameEl.dataset.cleanName = name;
+            nameEl.dataset.unit = metadata.unit || '';
+            
+            suggestCustomName();
+        } else {
+            nameEl.textContent = '✕ Código no encontrado en la API de la CEPAL.';
+            nameEl.style.color = 'var(--accent-red)';
+            nameEl.dataset.verified = "false";
+        }
+    } catch (err) {
+        nameEl.textContent = '✕ Error al validar con la API.';
+        nameEl.style.color = 'var(--accent-red)';
+        nameEl.dataset.verified = "false";
+        console.error(err);
+    }
+}
+
+function suggestCustomName() {
+    const op = document.getElementById('creator-operator').value;
+    const nameInput = document.getElementById('creator-custom-name');
+    
+    const rows = document.querySelectorAll('.creator-indicator-row');
+    const names = [];
+    const units = new Set();
+    
+    rows.forEach(row => {
+        const idx = row.id.replace('creator-indicator-row-', '');
+        const nameEl = document.getElementById(`creator-ind-${idx}-name`);
+        if (nameEl && nameEl.dataset.verified === "true") {
+            names.push(nameEl.dataset.cleanName);
+            if (nameEl.dataset.unit) {
+                units.add(nameEl.dataset.unit);
+            }
+        }
+    });
+    
+    if (names.length >= 2) {
+        let opWord = 'combinado con';
+        if (op === 'add') opWord = 'Suma de';
+        else if (op === 'subtract') opWord = 'Diferencia de';
+        else if (op === 'multiply') opWord = 'Producto de';
+        else if (op === 'divide') opWord = 'Ratio de';
+        
+        let customName = '';
+        if (op === 'divide') {
+            customName = names.join(' / ');
+        } else if (op === 'add' || op === 'multiply' || op === 'subtract') {
+            if (names.length === 2) {
+                customName = `${opWord} ${names[0]} y ${names[1]}`;
+            } else {
+                const last = names[names.length - 1];
+                const rest = names.slice(0, -1).join(', ');
+                customName = `${opWord} ${rest} y ${last}`;
+            }
+        } else {
+            customName = `${opWord} ${names.join(', ')}`;
+        }
+        nameInput.value = customName;
+        
+        // Auto suggest unit
+        const unitInput = document.getElementById('creator-custom-unit');
+        if (units.size === 1) {
+            unitInput.value = Array.from(units)[0];
+        } else if (op === 'divide') {
+            const rowUnits = [];
+            rows.forEach(row => {
+                const idx = row.id.replace('creator-indicator-row-', '');
+                const nameEl = document.getElementById(`creator-ind-${idx}-name`);
+                if (nameEl && nameEl.dataset.verified === "true") {
+                    rowUnits.push(nameEl.dataset.unit || 'unidad');
+                }
+            });
+            unitInput.value = rowUnits.join(' / ');
+        } else {
+            unitInput.value = '';
+        }
+    }
+}
+
+async function fetchIndicatorSeries(id) {
+    const url = `${API_DATA_BASE}/${id}/data?lang=es&members=${COLOMBIA_MEMBER_ID},${ALC_MEMBER_ID}`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Error API cepalstat al descargar indicador #${id}`);
+    const res = await response.json();
+    return res.body;
+}
+
+function extractSeriesData(body) {
+    const data = body.data || [];
+    const dimensions = body.dimensions || [];
+    
+    const yearDim = dimensions.find(d => d.id === YEAR_DIM_ID);
+    if (!yearDim) return { col: {}, alc: {}, years: new Set(), unit: '' };
+    
+    const yearMap = {};
+    yearDim.members.forEach(m => {
+        yearMap[m.id] = m.name;
+    });
+    
+    const metadata = body.metadata || {};
+    const unit = metadata.unit || '';
+    
+    // Detect default secondary filters
+    const secondaryFilters = {};
+    const secondaryDims = dimensions.filter(d => d.id !== COUNTRY_DIM_ID && d.id !== YEAR_DIM_ID);
+    secondaryDims.forEach(dim => {
+        const members = dim.members || [];
+        let defaultMember = members.find(m => m.selected === 1);
+        if (!defaultMember) defaultMember = members.find(m => m.in === 1);
+        if (!defaultMember) {
+            defaultMember = members.find(m => {
+                const name = m.name.toLowerCase();
+                return name.includes('ambos') || name.includes('total') || name.includes('nacional');
+            });
+        }
+        if (!defaultMember && members.length > 0) defaultMember = members[0];
+        if (defaultMember) {
+            secondaryFilters[dim.id] = defaultMember.id;
+        }
+    });
+    
+    // Filter records matching secondary filters
+    const filtered = data.filter(rec => {
+        for (const [dimId, memberId] of Object.entries(secondaryFilters)) {
+            const val = rec[`dim_${dimId}`];
+            if (val !== undefined && val !== memberId) {
+                return false;
+            }
+        }
+        return true;
+    });
+    
+    const colData = {};
+    const alcData = {};
+    const years = new Set();
+    
+    filtered.forEach(rec => {
+        const countryId = rec[`dim_${COUNTRY_DIM_ID}`];
+        const yearMemberId = rec[`dim_${YEAR_DIM_ID}`];
+        const yearLabel = yearMap[yearMemberId];
+        if (!yearLabel) return;
+        
+        const val = parseFloat(rec.value);
+        if (isNaN(val)) return;
+        
+        if (countryId === COLOMBIA_MEMBER_ID) {
+            colData[yearLabel] = val;
+            years.add(yearLabel);
+        } else if (countryId === ALC_MEMBER_ID) {
+            alcData[yearLabel] = val;
+            years.add(yearLabel);
+        }
+    });
+    
+    return { col: colData, alc: alcData, years, unit };
+}
+
+async function generateSyntheticIndicator() {
+    const rows = document.querySelectorAll('.creator-indicator-row');
+    const indicators = [];
+    
+    for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const idx = row.id.replace('creator-indicator-row-', '');
+        const idStr = document.getElementById(`creator-ind-${idx}-id`).value.trim();
+        if (!idStr) {
+            alert(`Por favor, ingresa el código del indicador #${idx}.`);
+            return;
+        }
+        const id = parseInt(idStr);
+        if (isNaN(id)) {
+            alert(`El código del indicador #${idx} debe ser un número válido.`);
+            return;
+        }
+        indicators.push({ index: idx, id: id });
+    }
+    
+    if (indicators.length < 2) {
+        alert('Debes ingresar al menos dos indicadores para combinar.');
+        return;
+    }
+    
+    const op = document.getElementById('creator-operator').value;
+    const scale = parseFloat(document.getElementById('creator-scale').value) || 1;
+    const customName = document.getElementById('creator-custom-name').value.trim() || 'Indicador Sintético Personalizado';
+    const customUnit = document.getElementById('creator-custom-unit').value.trim();
+    
+    const progressPanel = document.getElementById('creator-progress-panel');
+    const resultsArea = document.getElementById('creator-results-area');
+    const statusText = document.getElementById('creator-progress-status');
+    
+    progressPanel.style.display = 'flex';
+    resultsArea.style.display = 'none';
+    statusText.textContent = 'Descargando series desde la API de la CEPAL...';
+    
+    try {
+        // Fetch indicators in parallel
+        const bodies = await Promise.all(
+            indicators.map(ind => fetchIndicatorSeries(ind.id))
+        );
+        
+        statusText.textContent = 'Procesando y alineando datos de series...';
+        
+        const seriesList = bodies.map(body => extractSeriesData(body));
+        
+        // Auto-assign unit if customUnit is not entered
+        let resolvedUnit = customUnit;
+        if (!resolvedUnit) {
+            const allUnits = seriesList.map(s => s.unit);
+            const uniqueUnits = new Set(allUnits);
+            if (uniqueUnits.size === 1) {
+                resolvedUnit = allUnits[0];
+            } else if (op === 'divide') {
+                resolvedUnit = allUnits.map(u => u || 'unidad').join(' / ');
+            } else {
+                resolvedUnit = allUnits.filter(u => u).join(' & ');
+            }
+        }
+        
+        // Find union of all years from all series
+        const allYearsSet = new Set();
+        seriesList.forEach(series => {
+            series.years.forEach(yr => allYearsSet.add(yr));
+        });
+        const sortedYears = Array.from(allYearsSet).sort((x, y) => parseInt(x) - parseInt(y));
+        
+        appState.customIndicatorResults = [];
+        
+        sortedYears.forEach(year => {
+            // Collect Colombia values
+            const colVals = [];
+            let allColValid = true;
+            for (let s = 0; s < seriesList.length; s++) {
+                const val = seriesList[s].col[year];
+                if (val === undefined) {
+                    allColValid = false;
+                    break;
+                }
+                colVals.push(val);
+            }
+            
+            // Collect ALC values
+            const alcVals = [];
+            let allAlcValid = true;
+            for (let s = 0; s < seriesList.length; s++) {
+                const val = seriesList[s].alc[year];
+                if (val === undefined) {
+                    allAlcValid = false;
+                    break;
+                }
+                alcVals.push(val);
+            }
+            
+            let colVal = undefined;
+            let alcVal = undefined;
+            
+            if (allColValid) {
+                let res = colVals[0];
+                for (let v = 1; v < colVals.length; v++) {
+                    if (op === 'add') res += colVals[v];
+                    else if (op === 'subtract') res -= colVals[v];
+                    else if (op === 'multiply') res *= colVals[v];
+                    else if (op === 'divide') {
+                        if (colVals[v] !== 0) {
+                            res /= colVals[v];
+                        } else {
+                            res = undefined;
+                            break;
+                        }
+                    }
+                }
+                if (res !== undefined) {
+                    colVal = res * scale;
+                }
+            }
+            
+            if (allAlcValid) {
+                let res = alcVals[0];
+                for (let v = 1; v < alcVals.length; v++) {
+                    if (op === 'add') res += alcVals[v];
+                    else if (op === 'subtract') res -= alcVals[v];
+                    else if (op === 'multiply') res *= alcVals[v];
+                    else if (op === 'divide') {
+                        if (alcVals[v] !== 0) {
+                            res /= alcVals[v];
+                        } else {
+                            res = undefined;
+                            break;
+                        }
+                    }
+                }
+                if (res !== undefined) {
+                    alcVal = res * scale;
+                }
+            }
+            
+            if (colVal !== undefined || alcVal !== undefined) {
+                const gap = (colVal !== undefined && alcVal !== undefined) ? colVal - alcVal : 0;
+                const dre = (alcVal !== undefined && alcVal !== 0) ? gap / alcVal : 0;
+                
+                appState.customIndicatorResults.push({
+                    year: year,
+                    colVal: colVal,
+                    alcVal: alcVal,
+                    gap: gap,
+                    dre: dre
+                });
+            }
+        });
+        
+        if (appState.customIndicatorResults.length === 0) {
+            alert('No se encontraron años en común con datos válidos para todos los indicadores seleccionados.');
+            progressPanel.style.display = 'none';
+            return;
+        }
+        
+        // Hide loader, show results
+        progressPanel.style.display = 'none';
+        resultsArea.style.display = 'flex';
+        
+        // 1. Populate KPI Cards
+        const lastRec = appState.customIndicatorResults[appState.customIndicatorResults.length - 1];
+        
+        const kpiColVal = document.getElementById('creator-kpi-col-val');
+        const kpiColYear = document.getElementById('creator-kpi-col-year');
+        const kpiAlcVal = document.getElementById('creator-kpi-alc-val');
+        const kpiAlcYear = document.getElementById('creator-kpi-alc-year');
+        const kpiGapVal = document.getElementById('creator-kpi-gap-val');
+        const kpiGapPct = document.getElementById('creator-kpi-gap-pct');
+        
+        kpiColVal.textContent = lastRec.colVal !== undefined ? `${formatNumber(lastRec.colVal)} ${resolvedUnit}` : '-';
+        kpiColYear.innerHTML = `<span>Año: ${lastRec.year}</span>`;
+        
+        kpiAlcVal.textContent = lastRec.alcVal !== undefined ? `${formatNumber(lastRec.alcVal)} ${resolvedUnit}` : '-';
+        kpiAlcYear.innerHTML = `<span>Año: ${lastRec.year}</span>`;
+        
+        if (lastRec.colVal !== undefined && lastRec.alcVal !== undefined) {
+            kpiGapVal.textContent = `${formatNumber(lastRec.gap)} ${resolvedUnit}`;
+            kpiGapPct.innerHTML = `<i class="fa-solid ${lastRec.gap >= 0 ? 'fa-arrow-trend-up' : 'fa-arrow-trend-down'}"></i> <span>Diferencia de ${formatNumber(Math.abs(lastRec.dre * 100))}% vs ALC</span>`;
+        } else {
+            kpiGapVal.textContent = '-';
+            kpiGapPct.innerHTML = '<span>Dato parcial</span>';
+        }
+        
+        // 2. Render Chart
+        renderCustomChart(customName, resolvedUnit);
+        
+        // 3. Render Table
+        renderCustomTable();
+        
+    } catch (error) {
+        progressPanel.style.display = 'none';
+        alert(`Ocurrió un error al procesar el indicador: ${error.message}`);
+        console.error(error);
+    }
+}
+
+function renderCustomChart(name, unit) {
+    const ctx = document.getElementById('creator-chart');
+    if (!ctx) return;
+    
+    if (appState.customChartInstance) {
+        appState.customChartInstance.destroy();
+    }
+    
+    const years = appState.customIndicatorResults.map(r => r.year);
+    const colSeries = appState.customIndicatorResults.map(r => r.colVal !== undefined ? r.colVal : null);
+    const alcSeries = appState.customIndicatorResults.map(r => r.alcVal !== undefined ? r.alcVal : null);
+    
+    const config = {
+        type: 'line',
+        data: {
+            labels: years,
+            datasets: [
+                {
+                    label: 'Colombia',
+                    data: colSeries,
+                    borderColor: '#f59e0b',
+                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                    borderWidth: 3,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#f59e0b',
+                    tension: 0.15,
+                    spanGaps: true
+                },
+                {
+                    label: 'América Latina y el Caribe',
+                    data: alcSeries,
+                    borderColor: '#a855f7',
+                    backgroundColor: 'rgba(168, 85, 247, 0.1)',
+                    borderWidth: 3,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#a855f7',
+                    tension: 0.15,
+                    spanGaps: true
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: { color: '#e2e8f0', font: { family: 'Inter', size: 12 } }
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.dataset.label}: ${formatNumber(context.raw)} ${unit}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: 'rgba(255,255,255,0.03)' },
+                    ticks: { color: '#94a3b8', font: { family: 'Inter' } }
+                },
+                y: {
+                    grid: { color: 'rgba(255,255,255,0.03)' },
+                    ticks: { color: '#94a3b8', font: { family: 'Inter' } },
+                    title: { display: true, text: unit, color: '#94a3b8' }
+                }
+            }
+        }
+    };
+    
+    appState.customChartInstance = new Chart(ctx, config);
+}
+
+function renderCustomTable() {
+    const tbody = document.getElementById('creator-table-body');
+    if (!tbody) return;
+    
+    tbody.innerHTML = '';
+    
+    // Display in reverse order (newest first)
+    const reversed = [...appState.customIndicatorResults].reverse();
+    
+    reversed.forEach(row => {
+        const isProj = parseInt(row.year) >= 2025;
+        
+        let gapStr = '-';
+        let dreStr = '-';
+        if (row.colVal !== undefined && row.alcVal !== undefined) {
+            gapStr = formatNumber(row.gap);
+            dreStr = `${row.gap >= 0 ? '+' : ''}${formatNumber(row.dre * 100)}%`;
+        }
+        
+        const tr = document.createElement('tr');
+        tr.style.borderBottom = '1px solid var(--border-color)';
+        tr.innerHTML = `
+            <td style="padding: 0.5rem; text-align: left;">${row.year} ${isProj ? '<span style="font-size: 0.65rem; padding: 0.1rem 0.35rem; border-radius: 4px; background: rgba(168, 85, 247, 0.15); color: #c084fc;">PROY.</span>' : '<span style="font-size: 0.65rem; padding: 0.1rem 0.35rem; border-radius: 4px; background: rgba(16, 185, 129, 0.15); color: #34d399;">REAL</span>'}</td>
+            <td class="colombia-cell" style="padding: 0.5rem; text-align: right; font-weight: 600; color: var(--color-colombia);">${row.colVal !== undefined ? formatNumber(row.colVal) : '-'}</td>
+            <td class="alc-cell" style="padding: 0.5rem; text-align: right; font-weight: 600; color: var(--color-alc);">${row.alcVal !== undefined ? formatNumber(row.alcVal) : '-'}</td>
+            <td style="padding: 0.5rem; text-align: right;">${gapStr}</td>
+            <td style="padding: 0.5rem; text-align: right; font-weight: 500; color: ${row.gap >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'};">${dreStr}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function exportCustomToCSV() {
+    if (!appState.customIndicatorResults || appState.customIndicatorResults.length === 0) return;
+    
+    const customName = document.getElementById('creator-custom-name').value.trim() || 'Indicador Sintético';
+    const customUnit = document.getElementById('creator-custom-unit').value.trim() || '';
+    
+    let csvContent = '\uFEFF'; // BOM
+    csvContent += `Año,Colombia (${customUnit}),América Latina (${customUnit}),Brecha Absoluta (${customUnit}),Desviación Relativa Estándar (DRE)\n`;
+    
+    appState.customIndicatorResults.forEach(row => {
+        const col = row.colVal !== undefined ? row.colVal : '';
+        const alc = row.alcVal !== undefined ? row.alcVal : '';
+        const gap = row.colVal !== undefined && row.alcVal !== undefined ? row.gap : '';
+        const dre = row.colVal !== undefined && row.alcVal !== undefined ? row.dre : '';
+        csvContent += `${row.year},${col},${alc},${gap},${dre}\n`;
+    });
+    
+    const cleanFilename = `${customName.toLowerCase().replace(/[^a-z0-9]/g, '_')}_sintetico.csv`;
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    
+    if (navigator.msSaveBlob) {
+        navigator.msSaveBlob(blob, cleanFilename);
+    } else {
+        const link = document.createElement('a');
+        if (link.download !== undefined) {
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', cleanFilename);
             link.style.visibility = 'hidden';
             document.body.appendChild(link);
             link.click();

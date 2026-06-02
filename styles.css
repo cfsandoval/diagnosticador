@@ -1372,5 +1372,38 @@ body {
     box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
 }
 
+/* Creator Module Form Tweak */
+#creador-section .search-input:focus {
+    border-color: var(--accent-blue) !important;
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.25) !important;
+}
+
+#creador-section .select-control {
+    background-color: rgba(15, 23, 42, 0.4);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    cursor: pointer;
+    font-weight: 500;
+}
+
+#creador-section .select-control:focus {
+    border-color: var(--accent-blue);
+    outline: none;
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.25);
+}
+
+.btn-danger-icon:hover {
+    color: #f87171 !important;
+    transform: scale(1.15);
+}
+
+.creator-indicator-row {
+    transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.creator-indicator-row:hover {
+    border-color: rgba(59, 130, 246, 0.3) !important;
+}
+
 
 

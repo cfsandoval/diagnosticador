@@ -66,6 +66,10 @@
                             <i class="fa-solid fa-file-export"></i>
                             <span>Exportar Datos Base</span>
                         </li>
+                        <li class="structures-list-item" id="sidebar-creador-btn" onclick="selectCreadorSection()">
+                            <i class="fa-solid fa-calculator"></i>
+                            <span>Creador de Indicadores</span>
+                        </li>
                     </ul>
                 </div>
 
@@ -775,7 +779,175 @@
                                     <!-- Populated dynamically by JS -->
                                 </tbody>
                             </table>
+                </div>
+            </div>
+
+            <!-- SECTION 7: CREADOR DE INDICADORES SINTÉTICOS -->
+            <div id="creador-section" style="display: none; height: 100%;">
+                <header class="dashboard-header">
+                    <div class="dashboard-title-area">
+                        <span class="indicator-subtitle">Cálculo y Modelado Personalizado de Series</span>
+                        <h1 class="indicator-title">Creador de Indicadores Sintéticos</h1>
+                    </div>
+                    <div class="api-badge" style="background: rgba(59, 130, 246, 0.1); border-color: rgba(59, 130, 246, 0.2);">
+                        <span class="dot" style="background-color: var(--accent-blue); box-shadow: 0 0 8px var(--accent-blue);"></span>
+                        <span style="color: var(--accent-blue); font-weight: 600;">Módulo Creador</span>
+                    </div>
+                </header>
+
+                <div class="dashboard-body" style="padding-bottom: 2rem;">
+                    <!-- Configuration Form Card -->
+                    <div class="card" style="margin-bottom: 1.5rem;">
+                        <h2 class="chart-title" style="margin-bottom: 1rem;"><i class="fa-solid fa-gears" style="color: var(--accent-blue); margin-right: 0.5rem;"></i> Configuración del Indicador Sintético</h2>
+                        <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1.5rem; line-height: 1.5;">
+                            Ingresa dos o más códigos oficiales de la CEPAL y selecciona la operación matemática para combinarlos. El sistema consultará la API de la CEPAL y construirá las series temporales alineadas para Colombia y América Latina y el Caribe.
+                        </p>
+
+                        <!-- Dynamic list of indicators -->
+                        <div id="creator-indicators-list" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+                            <!-- Indicator rows will be injected here dynamically by JS -->
                         </div>
+
+                        <!-- Button to add more indicators -->
+                        <div style="margin-bottom: 1.5rem;">
+                            <button type="button" class="btn-primary" onclick="addIndicatorInputRow()" style="background: rgba(255, 255, 255, 0.05); border: 1px dashed var(--border-color); color: var(--text-primary); padding: 0.6rem 1rem; border-radius: 8px; display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; transition: var(--transition-smooth);">
+                                <i class="fa-solid fa-plus" style="color: var(--accent-blue);"></i>
+                                <span>Agregar otro indicador</span>
+                            </button>
+                        </div>
+
+                        <!-- Scaling and Metadata Options -->
+                        <div class="creator-form-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                            <!-- Operator Selector -->
+                            <div class="form-group" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                                <label class="filter-label" style="font-weight: 600; margin-bottom: 0;">Operación Matemática</label>
+                                <select class="select-control" id="creator-operator" style="padding: 0.6rem 2.5rem 0.6rem 1rem; border-radius: 8px; font-weight: 600;">
+                                    <option value="add">Suma (+)</option>
+                                    <option value="subtract">Resta (-)</option>
+                                    <option value="multiply">Multiplicación (×)</option>
+                                    <option value="divide">División (÷)</option>
+                                </select>
+                            </div>
+
+                            <!-- Scale Factor -->
+                            <div class="form-group" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                                <label class="filter-label" style="font-weight: 600; margin-bottom: 0;">Multiplicador (Escala)</label>
+                                <select class="select-control" id="creator-scale" style="padding: 0.6rem 2.5rem 0.6rem 1rem; border-radius: 8px;">
+                                    <option value="1">1 (Sin cambio)</option>
+                                    <option value="100">100 (Para obtener %)</option>
+                                    <option value="1000">1,000</option>
+                                    <option value="100000">100,000</option>
+                                </select>
+                            </div>
+
+                            <!-- Custom Name -->
+                            <div class="form-group" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                                <label class="filter-label" style="font-weight: 600; margin-bottom: 0;">Nombre del Indicador Sintético</label>
+                                <input type="text" id="creator-custom-name" class="search-input" placeholder="Ej: Pobreza Relativa Sintética" style="padding: 0.6rem 1rem; border-radius: 8px;">
+                            </div>
+
+                            <!-- Custom Unit -->
+                            <div class="form-group" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                                <label class="filter-label" style="font-weight: 600; margin-bottom: 0;">Unidad de Medida</label>
+                                <input type="text" id="creator-custom-unit" class="search-input" placeholder="Ej: % o USD/hab" style="padding: 0.6rem 1rem; border-radius: 8px;">
+                            </div>
+                        </div>
+
+                        <!-- Action Button -->
+                        <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem;">
+                            <button class="btn-primary" id="btn-creator-generate" onclick="generateSyntheticIndicator()" style="background: linear-gradient(135deg, var(--accent-blue) 0%, rgba(59,130,246,0.85) 100%); color: #0b0f19; font-weight: 600; padding: 0.75rem 1.75rem; border-radius: 8px; border: none; display: flex; align-items: center; gap: 0.5rem; cursor: pointer; transition: var(--transition-smooth);">
+                                <i class="fa-solid fa-play"></i>
+                                <span>Generar Indicador Sintético</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Loader Panel (hidden by default) -->
+                    <div id="creator-progress-panel" style="display: none; padding: 1.5rem; border: 1px solid var(--border-color); border-radius: 12px; background: rgba(15, 23, 42, 0.6); margin-bottom: 1.5rem; text-align: center; flex-direction: column; align-items: center; gap: 0.75rem;">
+                        <div class="spinner" style="border-top-color: var(--accent-blue);"></div>
+                        <span id="creator-progress-status" style="color: var(--text-primary); font-weight: 500; font-size: 0.9rem;">Consultando la API de la CEPAL...</span>
+                    </div>
+
+                    <!-- Output Results Panel (hidden by default) -->
+                    <div id="creator-results-area" style="display: none; flex-direction: column; gap: 1.5rem;">
+                        
+                        <!-- KPI Cards Grid -->
+                        <section class="kpi-grid">
+                            <!-- Colombia Custom KPI -->
+                            <div class="card card-colombia">
+                                <div class="kpi-title colombia">
+                                    <span>Colombia (Último Año)</span>
+                                    <i class="fa-solid fa-flag"></i>
+                                </div>
+                                <div class="kpi-value" id="creator-kpi-col-val">-</div>
+                                <div class="kpi-trend" id="creator-kpi-col-year">
+                                    <span>Año: -</span>
+                                </div>
+                            </div>
+
+                            <!-- ALC Custom KPI -->
+                            <div class="card card-alc">
+                                <div class="kpi-title alc">
+                                    <span>América Latina (Último Año)</span>
+                                    <i class="fa-solid fa-globe"></i>
+                                </div>
+                                <div class="kpi-value" id="creator-kpi-alc-val">-</div>
+                                <div class="kpi-trend" id="creator-kpi-alc-year">
+                                    <span>Año: -</span>
+                                </div>
+                            </div>
+
+                            <!-- Gap Custom KPI -->
+                            <div class="card card-gap">
+                                <div class="kpi-title gap">
+                                    <span>Brecha de Valor</span>
+                                    <i class="fa-solid fa-scale-unbalanced"></i>
+                                </div>
+                                <div class="kpi-value" id="creator-kpi-gap-val">-</div>
+                                <div class="kpi-trend" id="creator-kpi-gap-pct">
+                                    <span>Diferencia</span>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- Chart card -->
+                        <div style="display: grid; grid-template-columns: 1fr; gap: 1.5rem;">
+                            <!-- Chart Card -->
+                            <section class="card chart-card">
+                                <div class="chart-header">
+                                    <h2 class="chart-title">Evolución Histórica Comparada</h2>
+                                </div>
+                                <div class="chart-wrapper" style="height: 380px;">
+                                    <canvas id="creator-chart"></canvas>
+                                </div>
+                            </section>
+                        </div>
+
+                        <!-- Data Table Card -->
+                        <section class="card table-card">
+                            <div class="table-header">
+                                <h2 class="chart-title">Tabla de Datos Comparativa</h2>
+                                <button class="btn-primary" id="btn-creator-export-csv" onclick="exportCustomToCSV()">
+                                    <i class="fa-solid fa-download"></i> Exportar CSV
+                                </button>
+                            </div>
+                            <div class="table-wrapper">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th class="col-year">Año</th>
+                                            <th class="col-colombia">Colombia</th>
+                                            <th class="col-alc">América Latina y el Caribe</th>
+                                            <th class="col-gap">Brecha Absoluta</th>
+                                            <th class="col-pct">Brecha %</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="creator-table-body">
+                                        <!-- Dynamic rows will be inserted here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
                     </div>
                 </div>
             </div>
