@@ -4854,7 +4854,26 @@ function updateMassSelectedCount() {
                 warningEl.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> No tienes ningún indicador guardado. Agrega favoritos en el explorador de la izquierda antes de exportar.';
             } else {
                 const details = list.map(item => `• [ID: ${item.id}] ${item.name || 'Sin nombre'}`).join('<br>');
-                warningEl.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> No tienes indicadores guardados dentro de las categorías seleccionadas.<br><div style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 0.4rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 0.4rem; text-align: left; line-height: 1.4;"><strong>Guardados en el navegador:</strong><br>${details}</div>`;
+                
+                // User-visible debug info to isolate why count is 0
+                let debugInfo = [];
+                if (massState.flatIndicators) {
+                    const matchedFavs = massState.flatIndicators.filter(ind => isIndicatorFavorite(ind.id));
+                    debugInfo.push(`Favoritos encontrados en flatIndicators: ${matchedFavs.length}`);
+                    matchedFavs.forEach(ind => {
+                        const parts = ind.categoryPath ? ind.categoryPath.split(' / ') : [];
+                        const topCat = parts[0] || 'General';
+                        const subCat = parts[1] || 'General';
+                        const key = `${topCat} - ${subCat}`;
+                        const isCatChecked = massState.selectedSubcategories.has(key);
+                        debugInfo.push(`- [ID: ${ind.id}] en [${key}] (¿Seleccionado?: ${isCatChecked})`);
+                    });
+                } else {
+                    debugInfo.push("flatIndicators está vacío o undefined!");
+                }
+                const debugStr = debugInfo.join('<br>');
+                
+                warningEl.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> No tienes indicadores guardados dentro de las categorías seleccionadas.<br><div style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 0.4rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 0.4rem; text-align: left; line-height: 1.4;"><strong>Guardados en el navegador:</strong><br>${details}<br><br><strong>Información de depuración:</strong><br>${debugStr}</div>`;
             }
             warningEl.style.display = 'block';
         } else {
