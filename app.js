@@ -1259,6 +1259,11 @@ function switchGlobalSection(sectionId) {
         tendenciasSection.style.display = sectionId === 'tendencias' ? 'block' : 'none';
     }
     
+    const exportarDatosSection = document.getElementById('exportar-datos-section');
+    if (exportarDatosSection) {
+        exportarDatosSection.style.display = sectionId === 'exportar-datos' ? 'block' : 'none';
+    }
+    
     // Update sidebar brechas button active highlight
     const sidebarBrechasBtn = document.getElementById('sidebar-brechas-btn');
     if (sidebarBrechasBtn) {
@@ -1275,6 +1280,12 @@ function switchGlobalSection(sectionId) {
     const sidebarTendenciasBtn = document.getElementById('sidebar-tendencias-btn');
     if (sidebarTendenciasBtn) {
         sidebarTendenciasBtn.classList.toggle('active', sectionId === 'tendencias');
+    }
+    
+    // Update sidebar exportar-datos button active highlight
+    const sidebarExportarBtn = document.getElementById('sidebar-exportar-datos-btn');
+    if (sidebarExportarBtn) {
+        sidebarExportarBtn.classList.toggle('active', sectionId === 'exportar-datos');
     }
     
     // Auto load first indicator of structures if none is loaded yet
@@ -1305,7 +1316,7 @@ function selectMetodologiaSection() {
     // Clear selections in the thematic tree and structures
     document.querySelectorAll('.tree-leaf').forEach(el => el.classList.remove('selected'));
     document.querySelectorAll('.structures-list-item').forEach(el => {
-        if (el.id !== 'sidebar-metodologia-btn' && el.id !== 'sidebar-brechas-btn' && el.id !== 'sidebar-tendencias-btn') {
+        if (el.id !== 'sidebar-metodologia-btn' && el.id !== 'sidebar-brechas-btn' && el.id !== 'sidebar-tendencias-btn' && el.id !== 'sidebar-exportar-datos-btn') {
             el.classList.remove('active');
         }
     });
@@ -1318,12 +1329,27 @@ function selectTendenciasSection() {
     // Clear selections in the thematic tree and structures
     document.querySelectorAll('.tree-leaf').forEach(el => el.classList.remove('selected'));
     document.querySelectorAll('.structures-list-item').forEach(el => {
-        if (el.id !== 'sidebar-tendencias-btn' && el.id !== 'sidebar-brechas-btn' && el.id !== 'sidebar-metodologia-btn') {
+        if (el.id !== 'sidebar-tendencias-btn' && el.id !== 'sidebar-brechas-btn' && el.id !== 'sidebar-metodologia-btn' && el.id !== 'sidebar-exportar-datos-btn') {
             el.classList.remove('active');
         }
     });
     
     renderTendencias();
+}
+
+// 11e. Click handler for sidebar Exportar Datos section
+function selectExportarDatosSection() {
+    switchGlobalSection('exportar-datos');
+    
+    // Clear selections in the thematic tree and structures
+    document.querySelectorAll('.tree-leaf').forEach(el => el.classList.remove('selected'));
+    document.querySelectorAll('.structures-list-item').forEach(el => {
+        if (el.id !== 'sidebar-exportar-datos-btn' && el.id !== 'sidebar-brechas-btn' && el.id !== 'sidebar-metodologia-btn' && el.id !== 'sidebar-tendencias-btn') {
+            el.classList.remove('active');
+        }
+    });
+    
+    initExportarDatosSection();
 }
 
 // 12. Initialize Sidebar for Structures
@@ -4227,3 +4253,449 @@ function renderTendencias() {
     
     contentArea.innerHTML = html;
 }
+
+// ==========================================
+// 20. EXPORTAR DATOS BASE (MASS CONSULTATION)
+// ==========================================
+
+let massState = {
+    isExporting: false,
+    cancelled: false,
+    flatIndicators: [],
+    categories: {},
+    selectedCategories: new Set(),
+    results: [],
+    sortColumn: null,
+    sortDirection: 'asc'
+};
+
+function initExportarDatosSection() {
+    // Reset state
+    massState.isExporting = false;
+    massState.cancelled = false;
+    massState.results = [];
+    
+    // Hide progress, hide results
+    document.getElementById('mass-progress-panel').style.display = 'none';
+    document.getElementById('mass-results-card').style.display = 'none';
+    
+    document.getElementById('btn-mass-show').style.display = 'inline-flex';
+    document.getElementById('btn-mass-excel').style.display = 'inline-flex';
+    document.getElementById('btn-mass-cancel').style.display = 'none';
+    
+    // Group indicators by top category
+    massState.flatIndicators = appState.flatIndicators || [];
+    massState.categories = {};
+    
+    massState.flatIndicators.forEach(ind => {
+        const cat = ind.topCategory || 'General';
+        if (!massState.categories[cat]) {
+            massState.categories[cat] = [];
+        }
+        massState.categories[cat].push(ind);
+    });
+    
+    // Render checklist
+    const checklistContainer = document.getElementById('mass-categories-checklist');
+    if (checklistContainer) {
+        checklistContainer.innerHTML = '';
+        const categories = Object.keys(massState.categories).sort();
+        
+        if (categories.length === 0) {
+            checklistContainer.innerHTML = '<div style="color: var(--text-muted); font-size: 0.8125rem;">Cargando listado de indicadores...</div>';
+            document.getElementById('btn-mass-show').setAttribute('disabled', 'true');
+            document.getElementById('btn-mass-excel').setAttribute('disabled', 'true');
+            return;
+        }
+        
+        document.getElementById('btn-mass-show').removeAttribute('disabled');
+        document.getElementById('btn-mass-excel').removeAttribute('disabled');
+        
+        categories.forEach(cat => {
+            const count = massState.categories[cat].length;
+            const div = document.createElement('div');
+            div.innerHTML = `
+                <label class="report-checkbox-item" style="display: flex; align-items: center; justify-content: space-between; width: 100%; cursor: pointer;">
+                    <div style="display: flex; align-items: center; gap: 0.65rem;">
+                        <input type="checkbox" class="mass-category-checkbox" value="${cat}" checked onchange="updateMassSelectedCount()">
+                        <span>${cat}</span>
+                    </div>
+                    <span style="font-size: 0.75rem; color: var(--text-muted); background: rgba(255,255,255,0.03); padding: 0.15rem 0.45rem; border-radius: 4px;">${count} ind.</span>
+                </label>
+            `;
+            checklistContainer.appendChild(div);
+        });
+    }
+    
+    updateMassSelectedCount();
+}
+
+function updateMassSelectedCount() {
+    const checkboxes = document.querySelectorAll('.mass-category-checkbox:checked');
+    let totalCount = 0;
+    
+    massState.selectedCategories = new Set();
+    checkboxes.forEach(cb => {
+        const cat = cb.value;
+        massState.selectedCategories.add(cat);
+        totalCount += (massState.categories[cat] ? massState.categories[cat].length : 0);
+    });
+    
+    const countEl = document.getElementById('mass-selected-count');
+    if (countEl) {
+        countEl.textContent = `${totalCount} indicadores seleccionados`;
+    }
+    
+    const showBtn = document.getElementById('btn-mass-show');
+    const excelBtn = document.getElementById('btn-mass-excel');
+    
+    if (showBtn && excelBtn) {
+        if (totalCount === 0) {
+            showBtn.setAttribute('disabled', 'true');
+            excelBtn.setAttribute('disabled', 'true');
+            showBtn.style.opacity = '0.5';
+            showBtn.style.pointerEvents = 'none';
+            excelBtn.style.opacity = '0.5';
+            excelBtn.style.pointerEvents = 'none';
+        } else {
+            showBtn.removeAttribute('disabled');
+            excelBtn.removeAttribute('disabled');
+            showBtn.style.opacity = '1';
+            showBtn.style.pointerEvents = 'auto';
+            excelBtn.style.opacity = '1';
+            excelBtn.style.pointerEvents = 'auto';
+        }
+    }
+}
+
+function selectAllMassCategories(checked) {
+    document.querySelectorAll('.mass-category-checkbox').forEach(cb => {
+        cb.checked = checked;
+    });
+    updateMassSelectedCount();
+}
+
+async function startMassQuery(mode) {
+    massState.isExporting = true;
+    massState.cancelled = false;
+    massState.results = [];
+    
+    // Hide buttons, show progress, hide results card
+    document.getElementById('btn-mass-show').style.display = 'none';
+    document.getElementById('btn-mass-excel').style.display = 'none';
+    document.getElementById('btn-mass-cancel').style.display = 'inline-flex';
+    document.getElementById('mass-progress-panel').style.display = 'block';
+    document.getElementById('mass-results-card').style.display = 'none';
+    
+    // Gather all selected indicators
+    const indicatorsToFetch = [];
+    massState.flatIndicators.forEach(ind => {
+        if (massState.selectedCategories.has(ind.topCategory)) {
+            indicatorsToFetch.push(ind);
+        }
+    });
+    
+    const total = indicatorsToFetch.length;
+    let processed = 0;
+    const CONCURRENCY = 15;
+    
+    async function worker(queue) {
+        while (queue.length > 0 && !massState.cancelled) {
+            const ind = queue.shift();
+            if (!ind) continue;
+            
+            try {
+                const url = `${API_DATA_BASE}/${ind.id}/data?lang=es&members=${COLOMBIA_MEMBER_ID},${ALC_MEMBER_ID}`;
+                const response = await fetch(url);
+                if (response.ok) {
+                    const res = await response.json();
+                    const body = res.body;
+                    
+                    const record = extractSharedYearData(ind, body);
+                    if (record) {
+                        massState.results.push(record);
+                    }
+                }
+            } catch (err) {
+                console.error(`Error al descargar datos del indicador ${ind.id}:`, err);
+            }
+            
+            processed++;
+            updateMassProgress(processed, total, ind.name);
+        }
+    }
+    
+    const queue = [...indicatorsToFetch];
+    const workers = [];
+    for (let i = 0; i < Math.min(CONCURRENCY, queue.length); i++) {
+        workers.push(worker(queue));
+    }
+    
+    await Promise.all(workers);
+    
+    // Reset controls
+    massState.isExporting = false;
+    document.getElementById('btn-mass-cancel').style.display = 'none';
+    document.getElementById('btn-mass-show').style.display = 'inline-flex';
+    document.getElementById('btn-mass-excel').style.display = 'inline-flex';
+    
+    if (massState.cancelled) {
+        document.getElementById('mass-progress-status').textContent = 'Consulta cancelada. Resultados parciales obtenidos.';
+    } else {
+        document.getElementById('mass-progress-status').textContent = 'Consulta finalizada con éxito.';
+    }
+    
+    // Handle modes
+    if (mode === 'excel') {
+        downloadMassXlsReport();
+    } else if (mode === 'show') {
+        document.getElementById('mass-results-card').style.display = 'block';
+        renderMassTable();
+        document.getElementById('mass-results-card').scrollIntoView({ behavior: 'smooth' });
+    }
+}
+
+function cancelMassQuery() {
+    massState.cancelled = true;
+    document.getElementById('mass-progress-status').textContent = 'Cancelando y compilando resultados parciales...';
+}
+
+function updateMassProgress(processed, total, currentName) {
+    const pct = Math.round((processed / total) * 100);
+    const pctEl = document.getElementById('mass-progress-percent');
+    const fillEl = document.getElementById('mass-progress-fill');
+    const statusEl = document.getElementById('mass-progress-status');
+    const detailEl = document.getElementById('mass-progress-detail');
+    
+    if (pctEl) pctEl.textContent = `${pct}%`;
+    if (fillEl) fillEl.style.width = `${pct}%`;
+    
+    if (statusEl) {
+        if (massState.cancelled) {
+            statusEl.textContent = 'Cancelando y guardando datos...';
+        } else {
+            statusEl.textContent = `Procesando: ${processed} de ${total}`;
+        }
+    }
+    
+    if (detailEl) detailEl.textContent = `Indicador actual: ${currentName}`;
+}
+
+function downloadMassXlsReport() {
+    const sortedResults = [...massState.results].sort((a, b) => {
+        if (a.category !== b.category) return a.category.localeCompare(b.category);
+        return a.code - b.code;
+    });
+    
+    let xlsHtml = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" 
+              xmlns:x="urn:schemas-microsoft-com:office:excel" 
+              xmlns="http://www.w3.org/TR/REC-html40">
+        <head>
+            <meta charset="utf-8">
+            <!--[if gte mso 9]>
+            <xml>
+                <x:ExcelWorkbook>
+                    <x:ExcelWorksheets>
+                        <x:ExcelWorksheet>
+                            <x:Name>Indicadores CEPAL</x:Name>
+                            <x:WorksheetOptions>
+                                <x:DisplayGridlines/>
+                            </x:WorksheetOptions>
+                        </x:ExcelWorksheet>
+                    </x:ExcelWorksheets>
+                </x:ExcelWorkbook>
+            </xml>
+            <![endif]-->
+            <style>
+                body { font-family: 'Segoe UI', Arial, sans-serif; }
+                table { border-collapse: collapse; width: 100%; }
+                th { background-color: #f1f5f9; color: #0f172a; border: 1px solid #cbd5e1; padding: 10px; font-weight: bold; text-align: left; }
+                td { border: 1px solid #cbd5e1; padding: 8px; color: #334155; }
+                .text-center { text-align: center; }
+                .text-right { text-align: right; }
+                .category-row { background-color: #f8fafc; font-weight: bold; }
+                .header-title { font-size: 16pt; font-weight: bold; color: #1e3a8a; padding: 15px 0; }
+                .meta-cell { font-size: 9pt; color: #64748b; padding-bottom: 20px; }
+            </style>
+        </head>
+        <body>
+            <table>
+                <tr>
+                    <td colspan="8" class="header-title">Listado de Indicadores Comparativos CEPAL (Exportación)</td>
+                </tr>
+                <tr>
+                    <td colspan="8" class="meta-cell">
+                        <strong>Ámbito Geográfico:</strong> Colombia vs. América Latina y el Caribe (ALC)<br>
+                        <strong>Fecha de Generación:</strong> ${new Date().toLocaleDateString('es-ES')}<br>
+                        <strong>Origen de Datos:</strong> API Oficial de la CEPAL (Sistemas de Indicadores)<br>
+                        <strong>Total de Registros:</strong> ${sortedResults.length} indicadores comparados
+                    </td>
+                </tr>
+                <thead>
+                    <tr>
+                        <th style="width: 80px;">Código</th>
+                        <th style="width: 250px;">Clase / Ruta Temática</th>
+                        <th style="width: 350px;">Indicador</th>
+                        <th style="width: 80px;" class="text-center">Año Compartido</th>
+                        <th style="width: 120px;" class="text-right">Valor Colombia</th>
+                        <th style="width: 120px;" class="text-right">Valor Promedio ALC</th>
+                        <th style="width: 120px;" class="text-right">Brecha Absoluta</th>
+                        <th style="width: 120px;" class="text-right">Desviación Relativa Estándar (DRE)</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+    
+    sortedResults.forEach(row => {
+        xlsHtml += `
+            <tr>
+                <td class="text-center">${row.code}</td>
+                <td>${row.category}</td>
+                <td>${row.name}</td>
+                <td class="text-center">${row.year}</td>
+                <td class="text-right">${formatXlsValue(row.colVal)}</td>
+                <td class="text-right">${formatXlsValue(row.alcVal)}</td>
+                <td class="text-right">${formatXlsValue(row.gap)}</td>
+                <td class="text-right">${formatXlsValue(row.dre)}</td>
+            </tr>
+        `;
+    });
+    
+    xlsHtml += `
+                </tbody>
+            </table>
+        </body>
+        </html>
+    `;
+    
+    const filename = `listado_completo_cepal_${new Date().toISOString().slice(0,10)}.xls`;
+    const blob = new Blob(['\ufeff' + xlsHtml], {
+        type: 'application/vnd.ms-excel;charset=utf-8'
+    });
+    
+    if (navigator.msSaveBlob) {
+        navigator.msSaveBlob(blob, filename);
+    } else {
+        const link = document.createElement('a');
+        if (link.download !== undefined) {
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', filename);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    }
+}
+
+function renderMassTable() {
+    const tbody = document.getElementById('mass-results-table-body');
+    if (!tbody) return;
+    
+    tbody.innerHTML = '';
+    
+    if (massState.results.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--text-muted);">No se encontraron datos coincidentes para los indicadores seleccionados.</td></tr>';
+        return;
+    }
+    
+    // Sort before rendering if there's an active sort column
+    if (massState.sortColumn) {
+        const col = massState.sortColumn;
+        const dir = massState.sortDirection === 'asc' ? 1 : -1;
+        massState.results.sort((a, b) => {
+            let valA = a[col];
+            let valB = b[col];
+            if (typeof valA === 'string') {
+                return valA.localeCompare(valB) * dir;
+            }
+            return (valA - valB) * dir;
+        });
+    }
+    
+    massState.results.forEach(row => {
+        const tr = document.createElement('tr');
+        tr.className = 'mass-table-row';
+        tr.dataset.name = row.name.toLowerCase();
+        tr.dataset.category = row.category.toLowerCase();
+        tr.dataset.code = row.code.toString();
+        
+        tr.innerHTML = `
+            <td class="text-center" style="font-weight: 600; color: var(--text-primary);">${row.code}</td>
+            <td style="font-size: 0.8rem; color: var(--text-muted);">${row.category}</td>
+            <td style="font-weight: 500; color: var(--text-primary);">${row.name}</td>
+            <td style="text-align: center; font-weight: 500;">${row.year}</td>
+            <td style="text-align: right; font-weight: 600; color: var(--color-colombia);">${formatNumber(row.colVal)}</td>
+            <td style="text-align: right; font-weight: 600; color: var(--color-alc);">${formatNumber(row.alcVal)}</td>
+            <td style="text-align: right; font-weight: 500; color: ${row.gap >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'};">${row.gap >= 0 ? '+' : ''}${formatNumber(row.gap)}</td>
+            <td style="text-align: right; font-size: 0.8rem; color: var(--text-secondary); font-weight: 500;">${row.dre >= 0 ? '+' : ''}${formatNumber(row.dre)}</td>
+            <td style="text-align: center;">
+                <button class="btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.72rem; border-radius: 4px;" onclick="selectIndicatorFromTrend(${row.code}, '${row.name.replace(/'/g, "\\'")}')">
+                    <i class="fa-solid fa-chart-line"></i> Graficar
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function filterMassTable(query) {
+    const q = query.toLowerCase().trim();
+    const rows = document.querySelectorAll('.mass-table-row');
+    
+    rows.forEach(tr => {
+        const name = tr.dataset.name;
+        const cat = tr.dataset.category;
+        const code = tr.dataset.code;
+        
+        if (name.includes(q) || cat.includes(q) || code.includes(q)) {
+            tr.style.display = '';
+        } else {
+            tr.style.display = 'none';
+        }
+    });
+}
+
+function sortMassTable(column) {
+    if (massState.sortColumn === column) {
+        massState.sortDirection = massState.sortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+        massState.sortColumn = column;
+        massState.sortDirection = 'asc';
+    }
+    renderMassTable();
+}
+
+function exportMassTableToCSV() {
+    if (massState.results.length === 0) return;
+    
+    let csvContent = '\uFEFF'; // BOM
+    csvContent += 'Código,Clase/Ruta Temática,Indicador,Año Compartido,Valor Colombia,Valor América Latina,Brecha Absoluta,Desviación Relativa Estándar (DRE)\n';
+    
+    massState.results.forEach(row => {
+        const cat = `"${row.category.replace(/"/g, '""')}"`;
+        const name = `"${row.name.replace(/"/g, '""')}"`;
+        csvContent += `${row.code},${cat},${name},${row.year},${row.colVal},${row.alcVal},${row.gap},${row.dre}\n`;
+    });
+    
+    const filename = `listado_completo_cepal_${new Date().toISOString().slice(0,10)}.csv`;
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    
+    if (navigator.msSaveBlob) {
+        navigator.msSaveBlob(blob, filename);
+    } else {
+        const link = document.createElement('a');
+        if (link.download !== undefined) {
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', filename);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    }
+}
+
