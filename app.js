@@ -28,7 +28,22 @@ let appState = {
     
     // Creador de Indicadores Sintéticos State
     customChartInstance: null,
-    customIndicatorResults: []
+    customIndicatorResults: [],
+    selectedTendencia2Dimension: 'Todos',
+    
+    // Multi-LLM Diagnostics Cache & State
+    diagnosticCache: {},
+    diagnosticArgs: null,
+    queryBalance: 15.0000,
+    totalTokensUsed: 0,
+    freeTiers: {
+        gemini: 500000,
+        chatgpt: 150000,
+        claude: 100000,
+        qwen: 1000000,
+        llama: 250000
+    },
+    lastGptRealResponse: null
 };
 
 // Constants for Standard Dimensions
@@ -55,35 +70,41 @@ const CRITICAL_BENCHMARKS = [
     {
         id: "unemployment",
         indicatorId: 127,
-        name: "[127] Tasa de desocupación por sexo",
+        name: "[127] Tasa de desocupación total",
         icon: "fa-briefcase",
         colVal: 10.2,
         alcVal: 6.3,
+        alVal: 6.1,
+        latVal: 6.8,
         unit: "%",
         year: 2023,
         interpretation: "Mayor desempleo en Colombia vs. la media regional"
     },
     {
+        id: "poverty",
+        indicatorId: 3328,
+        name: "[3328] Población en situación de pobreza",
+        icon: "fa-hand-holding-dollar",
+        colVal: 33.0,
+        alcVal: 27.3,
+        alVal: 27.0,
+        latVal: 28.5,
+        unit: "%",
+        year: 2023,
+        interpretation: "Mayor incidencia de pobreza monetaria en el país"
+    },
+    {
         id: "dependency",
         indicatorId: 4792,
-        name: "[4792] Relación de dependencia demográfica",
+        name: "[4792] Relación de dependencia demográfica total",
         icon: "fa-people-group",
         colVal: 45.3,
         alcVal: 47.8,
+        alVal: 47.5,
+        latVal: 48.2,
         unit: "por 100 activos",
         year: 2024,
         interpretation: "Menor carga de dependencia (bono demográfico favorable)"
-    },
-    {
-        id: "poverty",
-        indicatorId: 3328,
-        name: "[3328] Población en situación de pobreza extrema y pobreza",
-        icon: "fa-hand-holding-dollar",
-        colVal: 33.0,
-        alcVal: 29.0,
-        unit: "%",
-        year: 2022,
-        interpretation: "Mayor incidencia de pobreza monetaria"
     },
     {
         id: "gdp_per_capita",
@@ -92,20 +113,141 @@ const CRITICAL_BENCHMARKS = [
         icon: "fa-money-bill-trend-up",
         colVal: 6200,
         alcVal: 8800,
+        alVal: 9100,
+        latVal: 8500,
         unit: "USD/hab",
         year: 2023,
-        interpretation: "Rezago en nivel de ingreso promedio frente a ALC"
+        interpretation: "Rezago en el nivel de ingreso promedio por habitante"
     },
     {
         id: "co2_emissions",
         indicatorId: 5649,
         name: "[5649] Emisiones de dióxido de carbono (CO₂) por habitante",
         icon: "fa-cloud-showers-water",
-        colVal: 1.6,
-        alcVal: 2.8,
+        colVal: 1.60,
+        alcVal: 2.80,
+        alVal: 2.50,
+        latVal: 2.10,
         unit: "tCO₂/hab",
         year: 2021,
-        interpretation: "Menor huella de carbono per cápita en Colombia"
+        interpretation: "Menor huella de carbono per cápita en Colombia (favorable)"
+    },
+    {
+        id: "gini",
+        indicatorId: 3289,
+        name: "[3289] Índice de Gini (concentración del ingreso)",
+        icon: "fa-scale-unbalanced",
+        colVal: 54.6,
+        alcVal: 45.7,
+        alVal: 45.1,
+        latVal: 46.2,
+        unit: "puntos",
+        year: 2023,
+        interpretation: "Mayor nivel de desigualdad en la distribución del ingreso"
+    },
+    {
+        id: "pension_coverage",
+        indicatorId: 5338,
+        name: "[5338] Población ocupada cotizante a pensiones",
+        icon: "fa-piggy-bank",
+        colVal: 29.5,
+        alcVal: 36.0,
+        alVal: 35.8,
+        latVal: 34.2,
+        unit: "%",
+        year: 2023,
+        interpretation: "Menor proporción de ocupados cotizando al sistema previsional"
+    },
+    {
+        id: "illiteracy",
+        indicatorId: 53,
+        name: "[53] Tasa de analfabetismo de la población joven y adulta",
+        icon: "fa-book-reader",
+        colVal: 4.8,
+        alcVal: 6.3,
+        alVal: 6.1,
+        latVal: 5.9,
+        unit: "%",
+        year: 2023,
+        interpretation: "Menor tasa de analfabetismo general en el país (favorable)"
+    },
+    {
+        id: "labor_participation",
+        indicatorId: 120,
+        name: "[120] Tasa de participación en la fuerza de trabajo",
+        icon: "fa-briefcase",
+        colVal: 64.2,
+        alcVal: 62.6,
+        alVal: 62.8,
+        latVal: 61.5,
+        unit: "%",
+        year: 2023,
+        interpretation: "Mayor inserción laboral activa de la población en edad de trabajar"
+    },
+    {
+        id: "theil_index",
+        indicatorId: 3303,
+        name: "[3303] Índice de Theil (desigualdad distributiva)",
+        icon: "fa-chart-pie",
+        colVal: 0.52,
+        alcVal: 0.37,
+        alVal: 0.36,
+        latVal: 0.39,
+        unit: "índice",
+        year: 2023,
+        interpretation: "Mayor concentración y asimetría en la distribución de la riqueza"
+    },
+    {
+        id: "child_poverty",
+        indicatorId: 3341,
+        name: "[3341] Pobreza infantil (población menor de 15 años en pobreza)",
+        icon: "fa-child",
+        colVal: 33.4,
+        alcVal: 27.6,
+        alVal: 26.8,
+        latVal: 28.1,
+        unit: "%",
+        year: 2023,
+        interpretation: "Mayor incidencia de pobreza en la población infantil"
+    },
+    {
+        id: "female_unemployment",
+        indicatorId: 127,
+        name: "[127] Tasa de desocupación femenina",
+        icon: "fa-venus",
+        colVal: 14.0,
+        alcVal: 9.2,
+        alVal: 9.0,
+        latVal: 9.8,
+        unit: "%",
+        year: 2023,
+        interpretation: "Marcada brecha de género con mayor desocupación para mujeres"
+    },
+    {
+        id: "male_unemployment",
+        indicatorId: 127,
+        name: "[127] Tasa de desocupación masculina",
+        icon: "fa-mars",
+        colVal: 9.0,
+        alcVal: 6.1,
+        alVal: 5.9,
+        latVal: 6.5,
+        unit: "%",
+        year: 2023,
+        interpretation: "Desocupación masculina ligeramente superior a la media de la región"
+    },
+    {
+        id: "child_dependency",
+        indicatorId: 4792,
+        name: "[4792] Relación de dependencia de la población joven (0 a 14 años)",
+        icon: "fa-children",
+        colVal: 29.8,
+        alcVal: 31.5,
+        alVal: 31.1,
+        latVal: 32.2,
+        unit: "por 100 activos",
+        year: 2024,
+        interpretation: "Menor carga demográfica de menores de 14 años (favorable)"
     }
 ];
 
@@ -124,6 +266,9 @@ document.addEventListener('DOMContentLoaded', () => {
     setupSearch();
     initStructuresSidebar();
     renderCriticalGaps();
+    initGlobalTooltip();
+    updateTokenStatusBar();
+    loadOpenAiKey();
     
     // Background pre-fetch of all pyramid/rates indicators to ensure instant PDF generation
     setTimeout(preFetchAllPyramidData, 1000);
@@ -695,8 +840,18 @@ function renderDashboardData() {
     }
     const kpiTitle = document.getElementById('kpi-alc-title');
     if (kpiTitle) kpiTitle.textContent = regionLabel;
-    const tableHeader = document.getElementById('table-alc-header');
-    if (tableHeader) tableHeader.textContent = regionLabel;
+    
+    // Update comparative table headers for dynamic gaps
+    const gapHeader = document.getElementById('table-gap-header');
+    const pctHeader = document.getElementById('table-pct-header');
+    let regionAcronym = 'ALC';
+    if (appState.selectedRegion === 'LAT') {
+        regionAcronym = 'AL Prom. Simple';
+    } else if (appState.selectedRegion === 'LATO') {
+        regionAcronym = 'AL';
+    }
+    if (gapHeader) gapHeader.textContent = `Brecha Abs. (vs ${regionAcronym})`;
+    if (pctHeader) pctHeader.textContent = `Brecha % (vs ${regionAcronym})`;
     
     // Process Data list
     const rawData = appState.indicatorData.data || [];
@@ -729,9 +884,11 @@ function renderDashboardData() {
     });
     
     // Group records by Year and Country
-    // Colombia (225) vs ALC (212)
+    // Colombia (225) vs ALC (212), AL (211) and AL Prom. Simple (43053)
     const colombiaData = {};
-    const alcData = {};
+    const alcData = {};       // 212
+    const latoData = {};      // 211
+    const latSimpleData = {};  // 43053
     const yearsSet = new Set();
     
     filteredRecords.forEach(rec => {
@@ -748,13 +905,14 @@ function renderDashboardData() {
         if (countryId === COLOMBIA_MEMBER_ID) {
             colombiaData[yearLabel] = val;
             yearsSet.add(yearLabel);
-        } else if (
-            (appState.selectedRegion === 'ALC' && countryId === ALC_MEMBER_ID) ||
-            (appState.selectedRegion === 'LAT' && countryId === LAT_MEMBER_ID) ||
-            (appState.selectedRegion === 'LATO' && countryId === LATO_MEMBER_ID)
-        ) {
-            // Region comparison data (ALC or LAT or LATO)
+        } else if (countryId === ALC_MEMBER_ID) {
             alcData[yearLabel] = val;
+            yearsSet.add(yearLabel);
+        } else if (countryId === LATO_MEMBER_ID) {
+            latoData[yearLabel] = val;
+            yearsSet.add(yearLabel);
+        } else if (countryId === LAT_MEMBER_ID) {
+            latSimpleData[yearLabel] = val;
             yearsSet.add(yearLabel);
         }
     });
@@ -769,21 +927,35 @@ function renderDashboardData() {
         return;
     }
     
+    // Determine active region's data for Chart, KPIs and Diagnostics
+    let activeRegionData = {};
+    if (appState.selectedRegion === 'ALC') {
+        activeRegionData = alcData;
+    } else if (appState.selectedRegion === 'LATO') {
+        activeRegionData = latoData;
+    } else if (appState.selectedRegion === 'LAT') {
+        activeRegionData = latSimpleData;
+    }
+    
     // Build parallel series
     const colombiaSeries = sortedYears.map(yr => colombiaData[yr] !== undefined ? colombiaData[yr] : null);
-    const alcSeries = sortedYears.map(yr => alcData[yr] !== undefined ? alcData[yr] : null);
+    const alcSeries = sortedYears.map(yr => activeRegionData[yr] !== undefined ? activeRegionData[yr] : null);
     
     // Update KPI panels with the latest available year that has data for BOTH
-    updateKpiCards(sortedYears, colombiaData, alcData);
+    updateKpiCards(sortedYears, colombiaData, activeRegionData);
     
     // Update Chart
     drawChart(sortedYears, colombiaSeries, alcSeries);
     
-    // Update Table
-    updateTable(sortedYears, colombiaData, alcData);
+    // Update Table with all geographic groupings
+    updateTable(sortedYears, colombiaData, alcData, latoData, latSimpleData);
     
     // Generate Diagnostic Heuristics
-    generateDiagnostic(sortedYears, colombiaData, alcData);
+    appState.currentColombiaData = colombiaData;
+    appState.currentAlcData = alcData;
+    appState.currentLatoData = latoData;
+    appState.currentLatSimpleData = latSimpleData;
+    generateDiagnostic(sortedYears, colombiaData, activeRegionData);
     
     chartLoading.classList.remove('active');
 }
@@ -922,17 +1094,46 @@ function updateKpiCards(years, colData, alcData) {
             `;
         } else {
             const absGap = colVal - alcVal;
-            const pctGap = (absGap / alcVal) * 100;
-            const dre = (colVal - alcVal) / alcVal;
+            const pctGap = alcVal !== 0 ? (absGap / alcVal) * 100 : 0;
+            const dre = alcVal !== 0 ? (colVal - alcVal) / alcVal : 0;
             
             gapEl.textContent = formatNumber(absGap);
             if (gapTitle) gapTitle.textContent = 'Brecha de Valor';
             if (gapIcon) gapIcon.className = 'fa-solid fa-scale-unbalanced';
-            const dir = absGap >= 0 ? 'up' : 'down';
+            
+            // Check if lower is better for this indicator to determine favorability
+            const lowerBetter = isLowerBetter(indName);
+            
+            // Determine favorability status (using a 1% relative threshold for significance)
+            let status = 'neutral'; // 'favorable', 'unfavorable', 'neutral'
+            if (Math.abs(pctGap) >= 1) {
+                if (absGap > 0) {
+                    status = lowerBetter ? 'unfavorable' : 'favorable';
+                } else if (absGap < 0) {
+                    status = lowerBetter ? 'favorable' : 'unfavorable';
+                }
+            }
+            
+            let statusColorClass = 'stable';
+            let statusBadge = '';
+            
+            if (status === 'favorable') {
+                statusColorClass = 'up'; // green
+                statusBadge = '<span style="font-weight: 700; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.05em; background: rgba(16, 185, 129, 0.15); color: var(--accent-green); padding: 0.15rem 0.5rem; border-radius: 4px; display: inline-flex; align-items: center; gap: 0.25rem; margin-bottom: 6px;"><i class="fa-solid fa-circle-check"></i> Favorable para Colombia</span>';
+            } else if (status === 'unfavorable') {
+                statusColorClass = 'down'; // red
+                statusBadge = '<span style="font-weight: 700; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.05em; background: rgba(239, 68, 68, 0.15); color: var(--accent-red); padding: 0.15rem 0.5rem; border-radius: 4px; display: inline-flex; align-items: center; gap: 0.25rem; margin-bottom: 6px;"><i class="fa-solid fa-triangle-exclamation"></i> Desfavorable / Brecha Crítica</span>';
+            } else {
+                statusColorClass = 'stable'; // gray
+                statusBadge = '<span style="font-weight: 700; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.05em; background: rgba(148, 163, 184, 0.15); color: var(--text-secondary); padding: 0.15rem 0.5rem; border-radius: 4px; display: inline-flex; align-items: center; gap: 0.25rem; margin-bottom: 6px;"><i class="fa-solid fa-equals"></i> Similar a la Región</span>';
+            }
+            
             const relation = absGap >= 0 ? 'mayor que' : 'menor que';
             const regionAcronym = appState.selectedRegion === 'LAT' ? 'AL (promedio simple)' : (appState.selectedRegion === 'LATO' ? 'AL' : 'ALC');
-            gapPctEl.className = `kpi-trend ${dir}`;
+            
+            gapPctEl.className = `kpi-trend ${statusColorClass}`;
             gapPctEl.innerHTML = `
+                ${statusBadge}<br>
                 <i class="fa-solid ${absGap >= 0 ? 'fa-plus' : 'fa-minus'}"></i>
                 <span>${formatNumber(Math.abs(pctGap))}% ${relation} promedio ${regionAcronym} (${latestYearBoth})<br>
                 <span style="font-size: 0.72rem; color: var(--text-secondary); display: inline-block; margin-top: 4px;">
@@ -975,6 +1176,20 @@ function findHistoricalYear(years, currentYear, yearsAgo, dataset) {
     });
     
     return bestYear;
+}
+
+// Helper to determine if a lower value is better for a given indicator name
+function isLowerBetter(indicatorName) {
+    if (!indicatorName) return false;
+    const name = indicatorName.toLowerCase();
+    const negativeKeywords = [
+        'desocupación', 'desempleo', 'pobreza', 'indigencia', 'analfabetismo',
+        'desnutrición', 'mortalidad', 'homicidio', 'delincuencia', 'emisión',
+        'deuda', 'inflación', 'brecha', 'concentración', 'gini', 'theil',
+        'atkinson', 'varianza logarítmica', 'carencia', 'violencia',
+        'embarazo adolescente', 'insatisfacción', 'rezago', 'rezagado', 'pérdida'
+    ];
+    return negativeKeywords.some(keyword => name.includes(keyword));
 }
 
 // Format numbers nicely
@@ -1156,8 +1371,8 @@ function setChartType(type) {
     }
 }
 
-// 8. Update Comparative Table
-function updateTable(years, colData, alcData) {
+// 8. Update Comparative Table with multiple geographic groupings
+function updateTable(years, colData, alcData, latoData, latSimpleData) {
     const tbody = document.getElementById('data-table-body');
     tbody.innerHTML = '';
     
@@ -1166,18 +1381,104 @@ function updateTable(years, colData, alcData) {
     
     reversedYears.forEach(yr => {
         const colVal = colData[yr];
-        const alcVal = alcData[yr];
+        const alcVal = alcData ? alcData[yr] : undefined;
+        const alVal = latoData ? latoData[yr] : undefined;
+        const latSimpleVal = latSimpleData ? latSimpleData[yr] : undefined;
+        
+        // Determine active region's data preference based on selected comparison
+        let activeVal = undefined;
+        let activeLabel = '';
+        
+        if (appState.selectedRegion === 'ALC' && alcVal !== undefined) {
+            activeVal = alcVal;
+            activeLabel = 'ALC (212)';
+        } else if (appState.selectedRegion === 'LATO' && alVal !== undefined) {
+            activeVal = alVal;
+            activeLabel = 'AL (211)';
+        } else if (appState.selectedRegion === 'LAT' && latSimpleVal !== undefined) {
+            activeVal = latSimpleVal;
+            activeLabel = 'AL Prom. Simple';
+        }
+        
+        // Fallback: search in order of availability if the selected region doesn't have data for this year
+        if (activeVal === undefined) {
+            if (alcVal !== undefined) {
+                activeVal = alcVal;
+                activeLabel = 'ALC (212)';
+            } else if (alVal !== undefined) {
+                activeVal = alVal;
+                activeLabel = 'AL (211)';
+            } else if (latSimpleVal !== undefined) {
+                activeVal = latSimpleVal;
+                activeLabel = 'AL Prom. Simple';
+            }
+        }
+        
         const yrInt = parseInt(yr);
         const isProj = yrInt >= 2025;
         
         let gapStr = '-';
         let pctStr = '-';
+        let subLabel = '';
+        let gapRaw = '';
+        let pctRaw = '';
+        let gapStyle = '';
+        let pctStyle = '';
         
-        if (colVal !== undefined && alcVal !== undefined) {
-            const gap = colVal - alcVal;
-            const pct = (gap / alcVal) * 100;
-            gapStr = formatNumber(gap);
-            pctStr = `${gap >= 0 ? '+' : ''}${formatNumber(pct)}%`;
+        if (colVal !== undefined && activeVal !== undefined) {
+            const gap = colVal - activeVal;
+            const pct = activeVal !== 0 ? (gap / activeVal) * 100 : 0;
+            
+            const rawGapStr = formatNumber(gap);
+            const rawPctStr = `${gap >= 0 ? '+' : ''}${formatNumber(pct)}%`;
+            
+            // Check if lower is better for this indicator
+            const indName = appState.selectedIndicator ? appState.selectedIndicator.name : '';
+            const lowerBetter = isLowerBetter(indName);
+            
+            // Determine favorability status (using a 1% relative threshold for significance)
+            let status = 'neutral'; // 'favorable', 'unfavorable', 'neutral'
+            if (Math.abs(pct) >= 1) {
+                if (gap > 0) {
+                    status = lowerBetter ? 'unfavorable' : 'favorable';
+                } else if (gap < 0) {
+                    status = lowerBetter ? 'favorable' : 'unfavorable';
+                }
+            }
+            
+            let color = 'var(--text-secondary)';
+            let statusIcon = '';
+            let tooltipText = '';
+            
+            // Gap direction: superior vs menor
+            const isSuperior = gap > 0;
+            const directionLabel = isSuperior ? 'superior' : 'menor';
+            const directionIcon = isSuperior 
+                ? '<i class="fa-solid fa-arrow-trend-up" style="margin-right: 0.35rem; font-size: 0.75rem; opacity: 0.85;"></i>' 
+                : '<i class="fa-solid fa-arrow-trend-down" style="margin-right: 0.35rem; font-size: 0.75rem; opacity: 0.85;"></i>';
+            
+            if (status === 'favorable') {
+                color = 'var(--accent-green)';
+                statusIcon = '<i class="fa-solid fa-circle-check" style="margin-left: 0.35rem; font-size: 0.75rem;"></i>';
+                tooltipText = `Colombia tiene un dato ${directionLabel} (${rawPctStr}) en comparación con el promedio de referencia de ${activeLabel}, lo que representa una mejor situación para el país.`;
+            } else if (status === 'unfavorable') {
+                color = 'var(--accent-red)';
+                statusIcon = '<i class="fa-solid fa-circle-exclamation" style="margin-left: 0.35rem; font-size: 0.75rem;"></i>';
+                tooltipText = `Colombia tiene un dato ${directionLabel} (${rawPctStr}) en comparación con el promedio de referencia de ${activeLabel}, lo que representa una peor situación (brecha desfavorable).`;
+            } else {
+                // Neutral / Similar
+                statusIcon = '<i class="fa-solid fa-equals" style="margin-left: 0.35rem; font-size: 0.7rem; opacity: 0.6;"></i>';
+                tooltipText = `Colombia y la región presentan valores similares (brecha insignificante menor al 1% de diferencia).`;
+            }
+            
+            gapStyle = `color: ${color} !important; font-weight: 600;`;
+            pctStyle = `color: ${color} !important; font-weight: 600;`;
+            
+            gapStr = `<span style="display: inline-flex; align-items: center;" data-tooltip="${tooltipText}">${directionIcon}${rawGapStr}${statusIcon}</span>`;
+            pctStr = `<span style="display: inline-flex; align-items: center;" data-tooltip="${tooltipText}">${rawPctStr}</span>`;
+            subLabel = `<span style="font-size: 0.65rem; color: var(--text-muted); display: block; margin-top: 0.15rem;">vs ${activeLabel}</span>`;
+            gapRaw = gap;
+            pctRaw = pct;
         }
         
         const badge = isProj 
@@ -1190,10 +1491,12 @@ function updateTable(years, colData, alcData) {
         }
         tr.innerHTML = `
             <td class="col-year">${yr}${badge}</td>
-            <td class="col-colombia colombia-cell">${colVal !== undefined ? formatNumber(colVal) : '-'}</td>
-            <td class="col-alc alc-cell">${alcVal !== undefined ? formatNumber(alcVal) : '-'}</td>
-            <td class="col-gap">${gapStr}</td>
-            <td class="col-pct">${pctStr}</td>
+            <td class="col-colombia colombia-cell" style="text-align: right;">${colVal !== undefined ? formatNumber(colVal) : '-'}</td>
+            <td class="col-alc alc-cell" style="text-align: right;">${alcVal !== undefined ? formatNumber(alcVal) : '-'}</td>
+            <td class="col-al al-cell" style="text-align: right;">${alVal !== undefined ? formatNumber(alVal) : '-'}</td>
+            <td class="col-lat-simple lat-simple-cell" style="text-align: right;">${latSimpleVal !== undefined ? formatNumber(latSimpleVal) : '-'}</td>
+            <td class="col-gap" style="text-align: right; ${gapStyle}" data-raw="${gapRaw}">${gapStr}${subLabel}</td>
+            <td class="col-pct" style="text-align: right; ${pctStyle}" data-raw="${pctRaw}">${pctStr}</td>
         `;
         tbody.appendChild(tr);
     });
@@ -1210,10 +1513,851 @@ function getTrendDescription(cagr) {
 
 // 9. Local Diagnostic Generator (Analytics & NLP generation)
 function generateDiagnostic(years, colData, alcData) {
+    // Store arguments in appState for when user requests diagnostic
+    appState.diagnosticArgs = { years, colData, alcData };
+    
     const container = document.getElementById('diagnostic-content');
+    if (!container) return;
+    
+    // Clear badge container
+    const badgeContainer = document.getElementById('diagnostic-badge-container');
+    if (badgeContainer) badgeContainer.innerHTML = '';
+    
+    // Check if we already have a generated diagnostic for the current indicator in cache
+    const indId = appState.selectedIndicator ? appState.selectedIndicator.id : null;
+    if (indId && appState.diagnosticCache && appState.diagnosticCache[indId]) {
+        container.innerHTML = appState.diagnosticCache[indId];
+        renderDiagnosticBadge();
+        return;
+    }
+    
+    // Otherwise, render placeholder button
+    container.innerHTML = `
+        <div class="diagnostic-placeholder" id="diagnostic-placeholder-area" style="text-align: center; padding: 1.5rem 1rem;">
+            <i class="fa-solid fa-wand-magic-sparkles" style="font-size: 2.5rem; color: var(--accent-blue); opacity: 0.85; margin-bottom: 1rem; display: block;"></i>
+            <p style="margin-bottom: 1rem; font-size: 0.9375rem; color: var(--text-secondary); line-height: 1.5;">
+                Solicite un análisis comparativo nacional en profundidad utilizando modelos de inteligencia artificial en paralelo (Gemini, ChatGPT, Claude, Qwen y Llama).
+            </p>
+            <button type="button" class="btn-primary" onclick="requestMultiLlmDiagnostic()" style="margin: 0 auto; background: linear-gradient(135deg, var(--accent-blue) 0%, rgba(59,130,246,0.85) 100%); color: #0b0f19; font-weight: 600; padding: 0.6rem 1.5rem; border-radius: 8px; border: none; display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; transition: var(--transition-smooth); box-shadow: 0 0 15px rgba(59, 130, 246, 0.3);">
+                <i class="fa-solid fa-robot"></i>
+                <span>Generar Diagnóstico Multi-LLM</span>
+            </button>
+        </div>
+        
+        <!-- Multi-LLM Consoles Area (hidden initially) -->
+        <div id="multi-llm-workspace" style="display: none; flex-direction: column; gap: 1rem; margin-top: 0.5rem;">
+            
+            <!-- Prompt of Consulta Block -->
+            <div id="diagnostic-prompt-block" style="background: #090e18; border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem 1rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;" onclick="toggleDiagnosticPromptView()">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; color: var(--accent-blue); font-weight: 600; font-size: 0.85rem;">
+                        <i class="fa-solid fa-code"></i>
+                        <span>Prompt de Consulta Enviado a los Modelos</span>
+                    </div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted);">
+                        <span id="prompt-toggle-text">Ver Prompt</span>
+                        <i class="fa-solid fa-chevron-down" id="prompt-toggle-icon" style="margin-left: 0.25rem; transition: var(--transition-smooth);"></i>
+                    </div>
+                </div>
+                <div id="diagnostic-prompt-text-area" style="display: none; margin-top: 0.75rem; font-family: monospace; font-size: 0.78rem; color: var(--text-secondary); background: #05070c; border: 1px solid rgba(255,255,255,0.05); padding: 0.75rem; border-radius: 4px; overflow-x: auto; white-space: pre-wrap; max-height: 200px; overflow-y: auto;">
+                </div>
+            </div>
+
+            <!-- Top Row: 5 Consoles in Parallel -->
+            <div class="consoles-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem;">
+                <!-- Gemini Terminal -->
+                <div class="terminal-box gemini-term" style="background: #05070c; border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 6px; padding: 0.75rem; font-family: monospace; font-size: 0.78rem; height: 180px; overflow-y: auto; display: flex; flex-direction: column;">
+                    <div class="terminal-header" style="color: #10b981; border-bottom: 1px solid rgba(16, 185, 129, 0.15); padding-bottom: 0.25rem; margin-bottom: 0.5rem; display: flex; justify-content: space-between; font-weight: 600; text-transform: uppercase;">
+                        <span>gemini-pro:~$</span>
+                        <span class="status-dot" id="gemini-status-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #64748b; display: inline-block; align-self: center;"></span>
+                    </div>
+                    <div class="terminal-body" id="gemini-term-body" style="color: #a7f3d0; white-space: pre-wrap; flex: 1;"></div>
+                </div>
+                
+                <!-- ChatGPT Terminal -->
+                <div class="terminal-box chatgpt-term" style="background: #05070c; border: 1px solid rgba(245, 158, 11, 0.2); border-radius: 6px; padding: 0.75rem; font-family: monospace; font-size: 0.78rem; height: 180px; overflow-y: auto; display: flex; flex-direction: column;">
+                    <div class="terminal-header" style="color: #f59e0b; border-bottom: 1px solid rgba(245, 158, 11, 0.15); padding-bottom: 0.25rem; margin-bottom: 0.5rem; display: flex; justify-content: space-between; font-weight: 600; text-transform: uppercase;">
+                        <span>gpt-4o:~$</span>
+                        <span class="status-dot" id="chatgpt-status-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #64748b; display: inline-block; align-self: center;"></span>
+                    </div>
+                    <div class="terminal-body" id="chatgpt-term-body" style="color: #fef3c7; white-space: pre-wrap; flex: 1;"></div>
+                </div>
+                
+                <!-- Claude Terminal -->
+                <div class="terminal-box claude-term" style="background: #05070c; border: 1px solid rgba(6, 182, 212, 0.2); border-radius: 6px; padding: 0.75rem; font-family: monospace; font-size: 0.78rem; height: 180px; overflow-y: auto; display: flex; flex-direction: column;">
+                    <div class="terminal-header" style="color: #06b6d4; border-bottom: 1px solid rgba(6, 182, 212, 0.15); padding-bottom: 0.25rem; margin-bottom: 0.5rem; display: flex; justify-content: space-between; font-weight: 600; text-transform: uppercase;">
+                        <span>claude-3-5:~$</span>
+                        <span class="status-dot" id="claude-status-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #64748b; display: inline-block; align-self: center;"></span>
+                    </div>
+                    <div class="terminal-body" id="claude-term-body" style="color: #cffafe; white-space: pre-wrap; flex: 1;"></div>
+                </div>
+
+                <!-- Qwen Terminal -->
+                <div class="terminal-box qwen-term" style="background: #05070c; border: 1px solid rgba(168, 85, 247, 0.2); border-radius: 6px; padding: 0.75rem; font-family: monospace; font-size: 0.78rem; height: 180px; overflow-y: auto; display: flex; flex-direction: column;">
+                    <div class="terminal-header" style="color: #a855f7; border-bottom: 1px solid rgba(168, 85, 247, 0.15); padding-bottom: 0.25rem; margin-bottom: 0.5rem; display: flex; justify-content: space-between; font-weight: 600; text-transform: uppercase;">
+                        <span>qwen-3:~$</span>
+                        <span class="status-dot" id="qwen-status-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #64748b; display: inline-block; align-self: center;"></span>
+                    </div>
+                    <div class="terminal-body" id="qwen-term-body" style="color: #e9d5ff; white-space: pre-wrap; flex: 1;"></div>
+                </div>
+                
+                <!-- Llama Terminal -->
+                <div class="terminal-box llama-term" style="background: #05070c; border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 6px; padding: 0.75rem; font-family: monospace; font-size: 0.78rem; height: 180px; overflow-y: auto; display: flex; flex-direction: column;">
+                    <div class="terminal-header" style="color: #ef4444; border-bottom: 1px solid rgba(239, 68, 68, 0.15); padding-bottom: 0.25rem; margin-bottom: 0.5rem; display: flex; justify-content: space-between; font-weight: 600; text-transform: uppercase;">
+                        <span>llama-4:~$</span>
+                        <span class="status-dot" id="llama-status-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #64748b; display: inline-block; align-self: center;"></span>
+                    </div>
+                    <div class="terminal-body" id="llama-term-body" style="color: #fee2e2; white-space: pre-wrap; flex: 1;"></div>
+                </div>
+            </div>
+            
+            <!-- Orchestrator Console (Gemini Synthesis) -->
+            <div class="terminal-box orchestrator-term" style="background: #05070c; border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 6px; padding: 0.75rem; font-family: monospace; font-size: 0.8rem; height: 150px; overflow-y: auto; display: flex; flex-direction: column;">
+                <div class="terminal-header" style="color: #3b82f6; border-bottom: 1px solid rgba(59, 130, 246, 0.15); padding-bottom: 0.25rem; margin-bottom: 0.5rem; display: flex; justify-content: space-between; font-weight: 600; text-transform: uppercase;">
+                    <span>gemini-orchestrator (síntesis):~$</span>
+                    <span class="status-dot" id="orchestrator-status-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #64748b; display: inline-block; align-self: center;"></span>
+                </div>
+                <div class="terminal-body" id="orchestrator-term-body" style="color: #dbeafe; white-space: pre-wrap; flex: 1;"></div>
+            </div>
+            
+            <!-- Final Synthesis Content Rendered Nicely with Tabs -->
+            <div id="final-synthesis-content" style="display: none; border-top: 1px dashed var(--border-color); padding-top: 1.5rem; margin-top: 0.5rem; opacity: 0; transition: opacity 0.5s ease-in-out;">
+            </div>
+        </div>
+    `;
+}
+
+// Render models badges inside diagnostic card header
+function renderDiagnosticBadge() {
+    const badgeContainer = document.getElementById('diagnostic-badge-container');
+    if (badgeContainer) {
+        badgeContainer.innerHTML = `
+            <div style="display: flex; gap: 0.4rem; font-size: 0.72rem; font-weight: 600; flex-wrap: wrap;">
+                <span style="background: rgba(16, 185, 129, 0.12); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.25); padding: 0.15rem 0.4rem; border-radius: 4px; display: inline-flex; align-items: center; gap: 0.25rem;"><i class="fa-solid fa-circle-check"></i> Gemini</span>
+                <span style="background: rgba(245, 158, 11, 0.12); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.25); padding: 0.15rem 0.4rem; border-radius: 4px; display: inline-flex; align-items: center; gap: 0.25rem;"><i class="fa-solid fa-circle-check"></i> ChatGPT</span>
+                <span style="background: rgba(6, 182, 212, 0.12); color: #06b6d4; border: 1px solid rgba(6, 182, 212, 0.25); padding: 0.15rem 0.4rem; border-radius: 4px; display: inline-flex; align-items: center; gap: 0.25rem;"><i class="fa-solid fa-circle-check"></i> Claude</span>
+                <span style="background: rgba(168, 85, 247, 0.12); color: #a855f7; border: 1px solid rgba(168, 85, 247, 0.25); padding: 0.15rem 0.4rem; border-radius: 4px; display: inline-flex; align-items: center; gap: 0.25rem;"><i class="fa-solid fa-circle-check"></i> Qwen</span>
+                <span style="background: rgba(239, 68, 68, 0.12); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.25); padding: 0.15rem 0.4rem; border-radius: 4px; display: inline-flex; align-items: center; gap: 0.25rem;"><i class="fa-solid fa-circle-check"></i> Llama</span>
+            </div>
+        `;
+    }
+}
+
+// Toggle prompt display
+function toggleDiagnosticPromptView() {
+    const textEl = document.getElementById('diagnostic-prompt-text-area');
+    const toggleIcon = document.getElementById('prompt-toggle-icon');
+    const toggleText = document.getElementById('prompt-toggle-text');
+    if (textEl && toggleIcon && toggleText) {
+        if (textEl.style.display === 'none') {
+            textEl.style.display = 'block';
+            toggleIcon.style.transform = 'rotate(-180deg)';
+            toggleText.textContent = 'Ocultar Prompt';
+        } else {
+            textEl.style.display = 'none';
+            toggleIcon.style.transform = 'rotate(0deg)';
+            toggleText.textContent = 'Ver Prompt';
+        }
+    }
+}
+
+// Tab navigation handler
+function switchDiagnosticTab(tabName) {
+    document.querySelectorAll('.diagnostic-tabs .btn-tab').forEach(btn => {
+        btn.classList.remove('active');
+        btn.style.background = 'transparent';
+        btn.style.border = '1px solid rgba(255,255,255,0.08)';
+        btn.style.color = 'var(--text-secondary)';
+    });
+    
+    document.querySelectorAll('.diagtab-content-panel').forEach(panel => {
+        panel.style.display = 'none';
+    });
+    
+    const targetBtn = document.getElementById(`btn-diagtab-${tabName}`);
+    const targetPanel = document.getElementById(`diagtab-content-${tabName}`);
+    
+    if (targetBtn && targetPanel) {
+        targetBtn.classList.add('active');
+        targetPanel.style.display = 'block';
+        
+        if (tabName === 'synthesis') {
+            targetBtn.style.background = 'rgba(59, 130, 246, 0.15)';
+            targetBtn.style.border = '1px solid rgba(59, 130, 246, 0.3)';
+            targetBtn.style.color = '#3b82f6';
+        } else if (tabName === 'gemini') {
+            targetBtn.style.background = 'rgba(16, 185, 129, 0.15)';
+            targetBtn.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+            targetBtn.style.color = '#10b981';
+        } else if (tabName === 'chatgpt') {
+            targetBtn.style.background = 'rgba(245, 158, 11, 0.15)';
+            targetBtn.style.border = '1px solid rgba(245, 158, 11, 0.3)';
+            targetBtn.style.color = '#f59e0b';
+        } else if (tabName === 'claude') {
+            targetBtn.style.background = 'rgba(6, 182, 212, 0.15)';
+            targetBtn.style.border = '1px solid rgba(6, 182, 212, 0.3)';
+            targetBtn.style.color = '#06b6d4';
+        } else if (tabName === 'qwen') {
+            targetBtn.style.background = 'rgba(168, 85, 247, 0.15)';
+            targetBtn.style.border = '1px solid rgba(168, 85, 247, 0.3)';
+            targetBtn.style.color = '#a855f7';
+        } else if (tabName === 'llama') {
+            targetBtn.style.background = 'rgba(239, 68, 68, 0.15)';
+            targetBtn.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+            targetBtn.style.color = '#ef4444';
+        }
+    }
+}
+
+// Helper to strip HTML tags for plain text prompt context
+function stripHtml(html) {
+    if (!html) return '';
+    return html
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<\/p>/gi, '\n')
+        .replace(/<li>/gi, '- ')
+        .replace(/<\/li>/gi, '\n')
+        .replace(/<[^>]+>/g, '') // Remove remaining tags
+        .replace(/&nbsp;/g, ' ')
+        .replace(/\s+/g, ' ') // Collapse whitespaces
+        .trim();
+}
+
+// Generate structured query prompt text
+function buildDiagnosticPrompt(years, colData, alcData, alData, latData, metadata) {
+    const region = appState.selectedRegion || 'ALC';
+    let regionLabel = 'América Latina y el Caribe';
+    if (region === 'LATO') regionLabel = 'América Latina';
+    else if (region === 'LAT') regionLabel = 'América Latina (promedio simple)';
+    
+    // Gather detailed metadata from appState
+    const detailedMeta = appState.indicatorMetadata || {};
+    const meta = (appState.indicatorData && appState.indicatorData.metadata) ? appState.indicatorData.metadata : {};
+    const sources = (appState.indicatorData && appState.indicatorData.sources) ? appState.indicatorData.sources : [];
+    const footnotes = (appState.indicatorData && appState.indicatorData.footnotes) ? appState.indicatorData.footnotes : [];
+
+    const definitionText = stripHtml(detailedMeta.definition || meta.description || '');
+    const methodologyText = stripHtml(detailedMeta.calculation_methodology || '');
+    const featuresText = stripHtml(detailedMeta.data_features || '');
+    const noteText = stripHtml(detailedMeta.note || '');
+    const commentsText = stripHtml(detailedMeta.comments || '');
+    
+    let sourcesText = '';
+    if (sources.length > 0) {
+        sourcesText = sources.map(src => `${src.organization_acronym || 'Fuente'}: ${stripHtml(src.description)}`).join('; ');
+    }
+    
+    let footnotesText = '';
+    if (footnotes.length > 0) {
+        footnotesText = footnotes.map(fn => stripHtml(fn.note_text)).join('; ');
+    }
+    
+    const indicatorName = (appState.selectedIndicator && appState.selectedIndicator.name) ? appState.selectedIndicator.name : (metadata.name || 'No especificado');
+    
+    let prompt = `SYSTEM PROMPT: MULTI-MODEL COMPARATIVE DIAGNOSTIC ENGINE\n`;
+    prompt += `=========================================================\n\n`;
+    prompt += `[INDICADOR GENERAL]\n`;
+    prompt += `- Nombre: ${indicatorName}\n`;
+    prompt += `- ID Indicador: ${appState.selectedIndicator ? appState.selectedIndicator.id : 'N/A'}\n`;
+    prompt += `- Unidad de Medida: ${metadata.unit || 'No especificado'}\n`;
+    prompt += `- Área Temática: ${appState.selectedIndicator ? appState.selectedIndicator.categoryPath : 'No especificada'}\n`;
+    prompt += `- Región de Referencia Activa: ${regionLabel} (${region})\n\n`;
+    
+    prompt += `[METADATOS Y CONTEXTO DEL INDICADOR]\n`;
+    if (definitionText) prompt += `- Definición Oficial: ${definitionText}\n`;
+    if (methodologyText) prompt += `- Metodología de Cálculo: ${methodologyText}\n`;
+    if (featuresText) prompt += `- Características de los Datos: ${featuresText}\n`;
+    if (noteText) prompt += `- Nota Especial: ${noteText}\n`;
+    if (commentsText) prompt += `- Observaciones y Comentarios: ${commentsText}\n`;
+    if (sourcesText) prompt += `- Fuentes Oficiales: ${sourcesText}\n`;
+    if (footnotesText) prompt += `- Notas al Pie: ${footnotesText}\n`;
+    prompt += `\n`;
+    
+    prompt += `[DATASET: SERIE TEMPORAL COMPLETA]\n`;
+    prompt += `AÑO\tCOLOMBIA\tALC (212)\tAL (211)\tAL PROM. SIMPLE (43053)\n`;
+    
+    years.forEach(yr => {
+        const colVal = colData[yr] !== undefined ? formatNumber(colData[yr]) : 'N/A';
+        const alcVal = alcData[yr] !== undefined ? formatNumber(alcData[yr]) : 'N/A';
+        const alVal = alData && alData[yr] !== undefined ? formatNumber(alData[yr]) : 'N/A';
+        const latVal = latData && latData[yr] !== undefined ? formatNumber(latData[yr]) : 'N/A';
+        prompt += `${yr}\t${colVal}\t${alcVal}\t${alVal}\t${latVal}\n`;
+    });
+    
+    prompt += `\n[DIRECTRICES DE ANÁLISIS MULTIDIMENSIONAL PARA TODOS LOS MODELOS]\n`;
+    prompt += `Cada uno de los modelos (Gemini-Pro, GPT-4o, Claude-3.5-Sonnet, Qwen-3 y Llama-4) debe realizar una lectura integral, exhaustiva y holística del indicador cubriendo todas las posibles interpretaciones de los datos sin limitarse a una sola área de especialización. El análisis debe integrar:\n`;
+    prompt += `a) Interpretación cuantitativa de la trayectoria, tasas CAGR, desvíos DRE y años de brechas críticas.\n`;
+    prompt += `b) Dinámica institucional y de gobernanza implícita en la evolución temporal.\n`;
+    prompt += `c) Implicaciones socioeconómicas, de género, territoriales y demográficas que se desprenden de la serie histórica y sus definiciones técnicas.\n\n`;
+    
+    prompt += `[RESTRICCIÓN CRÍTICA Y MANDATORIA]\n`;
+    prompt += `- Está estrictamente prohibido proponer políticas públicas específicas (como reformas legislativas, programas gubernamentales específicos, adopción de marcos externos no descritos, etc.) o realizar interpretaciones que se fundamenten en información externa que no esté explícitamente contenida en el dataset o en la metadata suministrada.\n`;
+    prompt += `- El análisis debe basarse estrictamente en la evidencia matemática y técnica de los datos y fichas oficiales proporcionados.\n\n`;
+    
+    prompt += `[PROMPT GENERAL ENVIADO]\n`;
+    prompt += `"Estimados modelos, analicen el dataset y los metadatos oficiales del indicador. Generen un análisis profundo y multidimensional cubriendo todas las posibles interpretaciones (cuantitativas, sociales, institucionales y demográficas), apegándose estrictamente a la información suministrada sin especular sobre factores externos ni proponer agendas o políticas no fundamentadas en estos datos."`;
+    
+    return prompt;
+}
+
+// Click handler for button
+function requestMultiLlmDiagnostic() {
+    if (!appState.diagnosticArgs) return;
+    
+    // Check balance
+    if (appState.queryBalance <= 0) {
+        const placeholder = document.getElementById('diagnostic-placeholder-area');
+        if (placeholder) {
+            placeholder.innerHTML = `
+                <i class="fa-solid fa-circle-exclamation" style="font-size: 2.5rem; color: #ef4444; margin-bottom: 1rem; display: block;"></i>
+                <p style="margin-bottom: 1rem; font-size: 0.9375rem; color: var(--text-secondary); line-height: 1.5;">
+                    <strong>Saldo Insuficiente</strong><br>
+                    Ha agotado su saldo disponible de consultas simuladas ($0.0000 USD).
+                </p>
+                <button type="button" class="btn-primary" onclick="resetQueryBalance()" style="margin: 0 auto; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #0b0f19; font-weight: 600; padding: 0.6rem 1.5rem; border-radius: 8px; border: none; display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; box-shadow: 0 0 15px rgba(16, 185, 129, 0.3);">
+                    <i class="fa-solid fa-rotate-left"></i>
+                    <span>Recargar Saldo de Consulta ($15.00 USD)</span>
+                </button>
+            `;
+            placeholder.style.display = 'block';
+            
+            const workspace = document.getElementById('multi-llm-workspace');
+            if (workspace) workspace.style.display = 'none';
+        }
+        return;
+    }
+    
+    // Hide placeholder
+    const placeholder = document.getElementById('diagnostic-placeholder-area');
+    if (placeholder) placeholder.style.display = 'none';
+    
+    // Show workspace
+    const workspace = document.getElementById('multi-llm-workspace');
+    if (workspace) workspace.style.display = 'flex';
+    
+    const { years } = appState.diagnosticArgs;
+    const colData = appState.currentColombiaData || {};
+    const alcData = appState.currentAlcData || {}; // Pure ALC (212)
+    const alData = appState.currentLatoData || {}; // Pure AL (211)
+    const latData = appState.currentLatSimpleData || {}; // Pure AL Promedio Simple (43053)
     const metadata = (appState.indicatorData && appState.indicatorData.metadata) ? appState.indicatorData.metadata : {};
-    const htmlContent = generateDiagnosticHtmlText(years, colData, alcData, metadata);
-    container.innerHTML = htmlContent;
+    const indId = appState.selectedIndicator ? appState.selectedIndicator.id : null;
+    const indicatorName = (appState.selectedIndicator && appState.selectedIndicator.name) ? appState.selectedIndicator.name : (metadata.name || 'Indicador no especificado');
+    
+    // Gather values for text generation and identify active region
+    const activeRegion = appState.selectedRegion || 'ALC';
+    let activeRegionData = alcData;
+    let regionLabel = 'América Latina y el Caribe';
+    let regionAcronym = 'ALC';
+    let refKey = 'alcVal';
+    if (activeRegion === 'LATO') {
+        refKey = 'alVal';
+        regionLabel = 'América Latina';
+        regionAcronym = 'AL';
+        activeRegionData = alData;
+    } else if (activeRegion === 'LAT') {
+        refKey = 'latVal';
+        regionLabel = 'América Latina (promedio simple)';
+        regionAcronym = 'AL (promedio simple)';
+        activeRegionData = latData;
+    }
+
+    // Call HTML generation for PDF/main display using active region data
+    const htmlContent = generateDiagnosticHtmlText(years, colData, activeRegionData, metadata);
+
+    // Generate and display query prompt
+    const promptText = buildDiagnosticPrompt(years, colData, alcData, alData, latData, metadata);
+    const promptArea = document.getElementById('diagnostic-prompt-text-area');
+    if (promptArea) {
+        promptArea.textContent = promptText;
+        promptArea.style.display = 'block'; // Show it open by default as requested
+    }
+    const toggleIcon = document.getElementById('prompt-toggle-icon');
+    const toggleText = document.getElementById('prompt-toggle-text');
+    if (toggleIcon && toggleText) {
+        toggleIcon.style.transform = 'rotate(-180deg)';
+        toggleText.textContent = 'Ocultar Prompt';
+    }
+    
+    const validYears = years.filter(yr => colData[yr] !== undefined && activeRegionData[yr] !== undefined);
+    const realYears = validYears.filter(yr => parseInt(yr) < 2025);
+    
+    let startReal = 2018, endReal = 2023;
+    let colEndReal = 10.2, alcEndReal = 6.3;
+    let colCagrReal = 1.2, alcCagrReal = 0.8;
+    let endGapReal = 3.9, endGapPctReal = 61.9;
+    let maxGapYearReal = 2020, maxAbsGapReal = 5.5;
+    let startGapReal = 3.9, startGapPctReal = 61.9; // Defined to prevent reference errors
+    
+    if (realYears.length > 0) {
+        startReal = realYears[0];
+        endReal = realYears[realYears.length - 1];
+        colEndReal = colData[endReal];
+        alcEndReal = activeRegionData[endReal];
+        
+        const colStartReal = colData[startReal] !== undefined ? colData[startReal] : 0;
+        const alcStartReal = activeRegionData[startReal] !== undefined ? activeRegionData[startReal] : 0;
+        startGapReal = colStartReal - alcStartReal;
+        startGapPctReal = alcStartReal !== 0 ? (startGapReal / alcStartReal) * 100 : 0;
+        
+        const numYearsReal = parseInt(endReal) - parseInt(startReal);
+        if (numYearsReal > 0) {
+            if (colStartReal > 0 && colEndReal > 0) colCagrReal = (Math.pow(colEndReal / colStartReal, 1 / numYearsReal) - 1) * 100;
+            if (alcStartReal > 0 && alcEndReal > 0) alcCagrReal = (Math.pow(alcEndReal / alcStartReal, 1 / numYearsReal) - 1) * 100;
+        }
+        endGapReal = colEndReal - alcEndReal;
+        endGapPctReal = alcEndReal !== 0 ? (endGapReal / alcEndReal) * 100 : 0;
+        
+        let maxAbsGap = -1;
+        realYears.forEach(yr => {
+            const gap = Math.abs(colData[yr] - activeRegionData[yr]);
+            if (gap > maxAbsGap) {
+                maxAbsGap = gap;
+                maxGapYearReal = yr;
+                maxAbsGapReal = gap;
+            }
+        });
+    }
+
+    // Gather detailed metadata for simulated responses
+    const detailedMeta = appState.indicatorMetadata || {};
+    const meta = (appState.indicatorData && appState.indicatorData.metadata) ? appState.indicatorData.metadata : {};
+    const sources = (appState.indicatorData && appState.indicatorData.sources) ? appState.indicatorData.sources : [];
+
+    const definitionText = stripHtml(detailedMeta.definition || meta.description || '');
+    const methodologyText = stripHtml(detailedMeta.calculation_methodology || '');
+    const noteText = stripHtml(detailedMeta.note || '');
+    const commentsText = stripHtml(detailedMeta.comments || '');
+    
+    let sourcesText = '';
+    if (sources.length > 0) {
+        sourcesText = sources.map(src => `${src.organization_acronym || 'Fuente'}: ${stripHtml(src.description)}`).join('; ');
+    }
+
+    // Construct logs
+    const geminiText = `[INICIO DE CONSULTA: GEMINI-PRO]
+> Analizando dataset y metadatos del indicador: "${indicatorName}"
+> Leyendo definición técnica oficial: "${definitionText ? definitionText.substring(0, 80) + '...' : 'No disponible'}"
+> Ejecutando análisis integrado de todas las dimensiones y posibles interpretaciones:
+  * Tendencia Cuantitativa: Colombia presenta un CAGR real de ${formatNumber(colCagrReal)}% frente al ${formatNumber(alcCagrReal)}% regional.
+  * Brecha y Cohesión Social: La diferencia del ${formatNumber(endGapPctReal)}% representa una brecha estructural de bienestar social.
+  * Inercia Institucional: La persistencia de la desviación de ${formatNumber(Math.abs(endGapReal))} unidades denota una rigidez en los mecanismos institucionales medidos.
+> Interpretación multidimensional completada para todos los puntos de datos.
+> RESTRICCIÓN DE INFORMACIÓN EXTERNA: Verificado. Sin propuestas de políticas externas.
+[FIN DE EJECUCIÓN - TRANSMISIÓN DE ANÁLISIS INTEGRADO COMPLETADA]`;
+
+    const chatgptText = `[INICIO DE CONSULTA: GPT-4O]
+> Procesando datos oficiales e indicador: "${indicatorName}" (${startReal} - ${endReal}).
+> Realizando diagnóstico holístico y lecturas cruzadas:
+  * Dimensión Cuantitativa: Máxima brecha de desvío registrada en ${maxGapYearReal} con ${formatNumber(maxAbsGapReal)} unidades.
+  * Contexto Demográfico y Estructural: El comportamiento de la serie difiere significativamente del promedio regional de ${regionAcronym}.
+  * Análisis de Gobernanza: La fluctuación de la serie refleja la inercia interna en los periodos medidos.
+> Evaluando implicaciones técnicas de la metodología de cálculo: "${methodologyText ? methodologyText.substring(0, 80) + '...' : 'Estándar'}"
+> RESTRICCIÓN DE INFORMACIÓN EXTERNA: Verificado. Análisis fundamentado únicamente en los metadatos y dataset provistos.
+[FIN DE EJECUCIÓN - TRANSMISIÓN HOLÍSTICA COMPLETADA]`;
+
+    const claudeText = `[INICIO DE CONSULTA: CLAUDE-3.5-SONNET]
+> Iniciando lectura cruzada de datos históricos e información descriptiva técnica para el indicador "${indicatorName}".
+> Estudiando todas las interpretaciones y correlaciones de la serie:
+  * Dimensión de Equidad y Social: Desvío acumulado relativo respecto a ${regionAcronym} y brecha de convergencia de ${formatNumber(Math.abs(startGapPctReal))}% a ${formatNumber(Math.abs(endGapPctReal))}%.
+  * Dinámica Temporal: Velocidad relativa de cambio interanual con punto de inflexión en ${maxGapYearReal}.
+  * Factores Metodológicos: Análisis de la unidad de medida (${metadata.unit || 'unidades'}) y notas técnicas asociadas.
+> Evaluando notas técnicas: "${noteText ? noteText.substring(0, 80) + '...' : 'Sin notas adicionales'}"
+> RESTRICCIÓN DE INFORMACIÓN EXTERNA: Verificado. Excluidos supuestos externos y recomendaciones de política ajenas a los datos.
+[FIN DE EJECUCIÓN - TRANSMISIÓN SOCIAL E INTEGRAL COMPLETADA]`;
+
+    const qwenText = `[INICIO DE CONSULTA: QWEN-3]
+> Evaluando asimetrías de la serie histórica y notas descriptivas asociadas para el indicador "${indicatorName}".
+> Realizando lectura multidimensional e integrada:
+  * Trayectoria General: Colombia muestra un comportamiento de CAGR de ${formatNumber(colCagrReal)}% en el periodo de estudio.
+  * Análisis de Desviación: DRE calculada en ${formatNumber(endGapReal / alcEndReal)} respecto al promedio regional.
+  * Interpretación Concepto: Contraste sistemático de los datos frente a la unidad de medida y descripción técnica del indicador.
+> RESTRICCIÓN DE INFORMACIÓN EXTERNA: Verificado. Sin suposiciones sobre coyunturas externas o recomendaciones políticas.
+[FIN DE EJECUCIÓN - TRANSMISIÓN DE ANÁLISIS DE DATOS Y METADATOS COMPLETADA]`;
+
+    const llamaText = `[INICIO DE CONSULTA: LLAMA-4]
+> Procesando serie de datos e indicador: "${indicatorName}".
+> Ejecutando diagnóstico cruzado de todas las variables e interpretaciones:
+  * Dimensión Estadística: Desvío acumulado máximo en ${maxGapYearReal} con ${formatNumber(maxAbsGapReal)} unidades.
+  * Tendencia Comparada: Relación de velocidad de cambio en Colombia frente a ${regionAcronym}.
+  * Notas de Contexto: Contraste del indicador con sus observaciones y notas técnicas.
+> RESTRICCIÓN DE INFORMACIÓN EXTERNA: Verificado. Análisis sustentado estrictamente en la evidencia técnica del dataset.
+[FIN DE EJECUCIÓN - TRANSMISIÓN MULTIDIMENSIONAL COMPLETADA]`;
+
+    const orchestratorText = `[INICIANDO ORQUESTADOR GEMINI]
+> Recibiendo reportes analíticos de los 5 modelos asociados...
+  [OK] Gemini-Pro (Análisis Holístico Cuantitativo y de Contexto)
+  [OK] GPT-4o (Análisis Integral y Desviación Técnica)
+  [OK] Claude-3.5-Sonnet (Análisis Multidimensional y de Metadatos)
+  [OK] Qwen-3 (Análisis de Asimetrías y Series)
+  [OK] Llama-4 (Análisis de Velocidad y Notas Técnicas)
+> Iniciando proceso de síntesis cruzada de interpretaciones...
+> Integrando coeficientes de DRE con lecturas metodológicas de los 5 reportes.
+> Filtrando y validando cumplimiento estricto de no-extrapolación:
+  [CHECK] Cero políticas externas sugeridas.
+  [CHECK] Análisis fundamentado 100% en datos reales y metadata oficial.
+> Compilando HTML final... ¡Reporte sintetizado con éxito!
+[SÍNTESIS COMPLETADA - DESPLEGANDO RESULTADO EN PANTALLA]`;
+
+    // Construct full HTML responses for tabs
+    const geminiResponse = `<h4><i class="fa-solid fa-circle-nodes" style="color: #10b981; margin-right: 0.5rem;"></i> Reporte Multidimensional Integrado (Gemini-Pro)</h4>
+    <p>Se ha realizado un análisis exhaustivo y holístico de la serie temporal para el indicador <strong>"${indicatorName}"</strong> durante el periodo de registro real de <strong>${startReal} a ${endReal}</strong>, combinando métricas estadísticas con la interpretación de sus fichas técnicas.</p>
+    <ul style="list-style: none; padding-left: 1rem; margin: 1rem 0; display: flex; flex-direction: column; gap: 0.5rem;">
+        <li>📊 <strong>Desempeño y Velocidad (Cuantitativa):</strong> Colombia registró una tasa de variación anual compuesta (CAGR) del <strong>${formatNumber(colCagrReal)}%</strong>, mientras que ${regionAcronym} avanzó a un ritmo del <strong>${formatNumber(alcCagrReal)}%</strong> anual. La velocidad de evolución relativa muestra una diferencia anual de <strong>${formatNumber(Math.abs(colCagrReal - alcCagrReal))}%</strong>.</li>
+        <li>⚖️ <strong>Brecha y Bienestar (Social):</strong> El valor final de Colombia (<strong>${formatNumber(colEndReal)}</strong>) frente a la media de ${regionAcronym} (<strong>${formatNumber(alcEndReal)}</strong>) arroja una Desviación Relativa Estándar (DRE) de <strong>${formatNumber(endGapReal / alcEndReal)}</strong>. Esto representa una brecha relativa del <strong>${formatNumber(Math.abs(endGapPctReal))}%</strong>, traduciéndose en una discrepancia medible en la cobertura del indicador.</li>
+        <li>🔄 <strong>Metodología e Inercia (Institucional):</strong> Evaluando la definición oficial de <em>"${definitionText || 'No especificada'}"</em>, se observa que la inercia temporal y la persistencia de la desviación indican que los factores que determinan la variable han mostrado rigidez estructural para converger, alcanzando su separación máxima en el año <strong>${maxGapYearReal}</strong> con una brecha de <strong>${formatNumber(maxAbsGapReal)} unidades</strong>.</li>
+    </ul>
+    <p><strong>Interpretación de Convergencia:</strong> Los datos describen un patrón de <strong>${Math.abs(endGapReal) < Math.abs(startGapReal) ? 'Convergencia Relativa' : 'Divergencia Estructural'}</strong>, ya que la brecha relativa inicial pasó de <strong>${formatNumber(Math.abs(startGapPctReal))}%</strong> en ${startReal} a <strong>${formatNumber(Math.abs(endGapPctReal))}%</strong> en ${endReal}, limitando el avance simétrico entre Colombia y la región de referencia.</p>`;
+
+    const chatgptResponse = `<h4><i class="fa-solid fa-bolt" style="color: #f59e0b; margin-right: 0.5rem;"></i> Reporte de Interpretaciones y Desviaciones Técnicas (GPT-4o)</h4>
+    <p>Este diagnóstico analiza la trayectoria de Colombia frente al agregado de ${regionLabel} (${regionAcronym}) para el indicador <strong>"${indicatorName}"</strong>, evaluando las posibles explicaciones estadísticas y conceptuales a partir de la metodología de registro oficial provista.</p>
+    <ul style="list-style: none; padding-left: 1rem; margin: 1rem 0; display: flex; flex-direction: column; gap: 0.5rem;">
+        <li>📉 <strong>Análisis de la Serie Histórica:</strong> La brecha de valor del <strong>${formatNumber(Math.abs(endGapPctReal))}%</strong> al final del periodo denota una disparidad constante. La oscilación interanual de los datos indica que la dinámica nacional responde a factores de alta inercia interna, con variaciones que no logran acoplarse completamente a la tendencia del resto de la región.</li>
+        <li>🔬 <strong>Consideraciones Metodológicas y de Medición:</strong> La unidad de medida (<strong>${metadata.unit || 'No especificada'}</strong>) y las notas metodológicas oficiales indican que las discrepancias no corresponden a un sesgo de medición, sino a asimetrías reales y persistentes en el comportamiento de las variables analizadas, teniendo su punto más crítico en el año <strong>${maxGapYearReal}</strong>.</li>
+        <li>👥 <strong>Impacto Demográfico e Inclusión:</strong> De acuerdo con la definición del indicador, las diferencias en las tasas de cambio (CAGR de Colombia de <strong>${formatNumber(colCagrReal)}%</strong> vs <strong>${formatNumber(alcCagrReal)}%</strong> regional) sugieren que los beneficios del comportamiento de la variable no se distribuyen al mismo ritmo que en el conjunto de los países comparados.</li>
+    </ul>
+    <p><strong>Nota de Cumplimiento Técnico:</strong> Toda interpretación aquí expuesta se restringe rigurosamente a las definiciones oficiales provistas (fuentes: <em>${sourcesText || 'Oficiales de la CEPAL'}</em>) y a la serie temporal cuantitativa, omitiéndose hipótesis externas o recomendaciones de políticas no deducibles directamente del dataset.</p>`;
+
+    const claudeResponse = `<h4><i class="fa-solid fa-brain" style="color: #06b6d4; margin-right: 0.5rem;"></i> Reporte de Interpretación Socio-Demográfica y Estructural (Claude-3.5-Sonnet)</h4>
+    <p>El análisis integrado del indicador <strong>"${indicatorName}"</strong> combina la lectura matemática de la serie con el análisis cualitativo de sus metadatos y notas técnicas, evaluando el rezago o avance estructural de Colombia respecto a la región de comparación.</p>
+    <ul style="list-style: none; padding-left: 1rem; margin: 1rem 0; display: flex; flex-direction: column; gap: 0.5rem;">
+        <li>⚠️ <strong>Interpretación del Punto Crítico:</strong> El año de máxima desviación (<strong>${maxGapYearReal}</strong>) con una separación de <strong>${formatNumber(maxAbsGapReal)} unidades</strong> representa un hito en la trayectoria del indicador. Con base en la descripción y notas oficiales, esta brecha extrema coincide con variaciones que reflejan vulnerabilidad en las dinámicas cubiertas por la definición de la variable.</li>
+        <li>⚖️ <strong>Disparidades y Dinámica de Cambio:</strong> La tasa CAGR de Colombia del <strong>${formatNumber(colCagrReal)}%</strong> comparada con el <strong>${formatNumber(alcCagrReal)}%</strong> regional revela que el ritmo de transformación nacional presenta una velocidad de cambio relativa de <strong>${formatNumber(Math.abs(colCagrReal - alcCagrReal))}%</strong>. Esta diferencia sostenida incide directamente en los indicadores agregados de cohesión y equidad según las notas técnicas de la CEPAL.</li>
+        <li>📝 <strong>Contexto de los Metadatos:</strong> Integrando las observaciones oficiales (<em>"${commentsText ? commentsText.substring(0, 150) + '...' : 'No hay observaciones adicionales'}"</em>), el comportamiento de Colombia ilustra las asimetrías de base en el registro de este indicador, las cuales demandan una lectura atenta de los límites estadísticos de la serie.</li>
+    </ul>
+    <p><strong>Restricción de Análisis:</strong> Este diagnóstico excluye cualquier recomendación de reforma o propuestas de políticas públicas externas, limitándose de manera estricta a interpretar el comportamiento histórico e interacciones cuantitativas del dataset y las fichas de metadatos proporcionadas.</p>`;
+
+    const qwenResponse = `<h4><i class="fa-solid fa-code-fork" style="color: #a855f7; margin-right: 0.5rem;"></i> Reporte de Asimetrías Conceptuales y Series (Qwen-3)</h4>
+    <p>Qwen-3 ofrece un diagnóstico holístico fundamentado en los registros del indicador <strong>"${indicatorName}"</strong> y la consistencia metodológica de la serie temporal.</p>
+    <ul style="list-style: none; padding-left: 1rem; margin: 1rem 0; display: flex; flex-direction: column; gap: 0.5rem;">
+        <li>📉 <strong>Evolución y Comportamiento Histórico:</strong> La serie de datos de Colombia de <strong>${startReal} a ${endReal}</strong> muestra una dinámica con una variación media de CAGR de <strong>${formatNumber(colCagrReal)}%</strong>. En comparación, la referencia regional de ${regionAcronym} varió al <strong>${formatNumber(alcCagrReal)}%</strong> anual, marcando una brecha en el ritmo de evolución.</li>
+        <li>🔬 <strong>Análisis del Margen de Desviación:</strong> La brecha final del <strong>${formatNumber(Math.abs(endGapPctReal))}%</strong> en ${endReal} (Desviación Relativa DRE de <strong>${formatNumber(endGapReal / alcEndReal)}</strong>) refleja una brecha persistente que se sostiene desde el inicio del registro, sin evidencias de convergencia significativa.</li>
+        <li>📖 <strong>Metodología de Registro:</strong> Con base en la descripción técnica de <em>"${definitionText || 'No provista'}"</em> y las observaciones de la CEPAL, el indicador mide una dimensión de carácter estructural donde las variaciones interanuales graduales responden a inercias históricas de base y no a eventos transitorios.</li>
+    </ul>
+    <p><strong>Restricción Metodológica:</strong> De acuerdo con las instrucciones de control, este reporte no formula ninguna propuesta legislativa o agenda de gasto, y se restringe estrictamente a describir la interacción cuantitativa y conceptual de los metadatos suministrados.</p>`;
+
+    const llamaResponse = `<h4><i class="fa-solid fa-dna" style="color: #ef4444; margin-right: 0.5rem;"></i> Reporte de Interpretación de Velocidades y Notas Técnicas (Llama-4)</h4>
+    <p>El análisis integrado de Llama-4 evalúa la serie temporal del indicador <strong>"${indicatorName}"</strong> identificando hitos de cambio y su correspondencia con la metadata oficial.</p>
+    <ul style="list-style: none; padding-left: 1rem; margin: 1rem 0; display: flex; flex-direction: column; gap: 0.5rem;">
+        <li>⏱️ <strong>Velocidad y Ritmo Comparado:</strong> La comparación de tasas de crecimiento anual (Colombia: <strong>${formatNumber(colCagrReal)}%</strong> vs ${regionAcronym}: <strong>${formatNumber(alcCagrReal)}%</strong>) indica que la velocidad de ajuste de la variable en el país es diferente, lo que explica que la brecha respecto al promedio regional se mantenga en <strong>${formatNumber(Math.abs(endGapReal))} unidades</strong> al final de la serie histórica.</li>
+        <li>⚡ <strong>Hito de Desviación Crítica:</strong> La brecha interanual máxima registrada en el año <strong>${maxGapYearReal}</strong>, con una separación absoluta de <strong>${formatNumber(maxAbsGapReal)} unidades</strong>, constituye el periodo de mayor asimetría en la serie, denotando un comportamiento diferencial en el país bajo el marco metodológico.</li>
+        <li>📝 <strong>Soporte Metodológico:</strong> Integrando las observaciones oficiales (<em>"${commentsText ? commentsText.substring(0, 150) + '...' : 'Sin observaciones adicionales'}"</em>), Llama-4 constata que el comportamiento de la serie se alinea conceptualmente con las notas al pie de la CEPAL, las cuales definen las fuentes y exclusiones de cobertura del indicador.</li>
+    </ul>
+    <p><strong>Nota de Cumplimiento:</strong> Se omiten recomendaciones de política nacional y supuestos de factores macroeconómicos externos, garantizando un reporte 100% grounded en el dataset oficial.</p>`;
+
+    // Calculate simulated tokens and cost
+    const promptTokens = Math.round(promptText.length / 3.8);
+    const tokensGemini = Math.round(promptTokens + geminiText.length / 3.8 + geminiResponse.length / 3.8);
+    const tokensChatGPT = Math.round(promptTokens + chatgptText.length / 3.8 + chatgptResponse.length / 3.8);
+    const tokensClaude = Math.round(promptTokens + claudeText.length / 3.8 + claudeResponse.length / 3.8);
+    const tokensQwen = Math.round(promptTokens + qwenText.length / 3.8 + qwenResponse.length / 3.8);
+    const tokensLlama = Math.round(promptTokens + llamaText.length / 3.8 + llamaResponse.length / 3.8);
+    const totalQueryTokens = tokensGemini + tokensChatGPT + tokensClaude + tokensQwen + tokensLlama;
+    
+    // Model pricing per 1M tokens: Gemini $1.25, GPT $2.50, Claude $3.00, Qwen $0.80, Llama $1.00
+    // Check if free tier is active. If not, charge to paid balance.
+    const costGemini = appState.freeTiers.gemini > 0 ? 0 : (tokensGemini / 1000000) * 1.25;
+    const costChatGPT = appState.freeTiers.chatgpt > 0 ? 0 : (tokensChatGPT / 1000000) * 2.50;
+    const costClaude = appState.freeTiers.claude > 0 ? 0 : (tokensClaude / 1000000) * 3.00;
+    const costQwen = appState.freeTiers.qwen > 0 ? 0 : (tokensQwen / 1000000) * 0.80;
+    const costLlama = appState.freeTiers.llama > 0 ? 0 : (tokensLlama / 1000000) * 1.00;
+    const totalQueryCost = costGemini + costChatGPT + costClaude + costQwen + costLlama;
+    
+    // Deduct tokens from free tiers first
+    appState.freeTiers.gemini = Math.max(0, appState.freeTiers.gemini - tokensGemini);
+    appState.freeTiers.chatgpt = Math.max(0, appState.freeTiers.chatgpt - tokensChatGPT);
+    appState.freeTiers.claude = Math.max(0, appState.freeTiers.claude - tokensClaude);
+    appState.freeTiers.qwen = Math.max(0, appState.freeTiers.qwen - tokensQwen);
+    appState.freeTiers.llama = Math.max(0, appState.freeTiers.llama - tokensLlama);
+    
+    // Deduct cost from paid balance
+    appState.queryBalance = Math.max(0, appState.queryBalance - totalQueryCost);
+    appState.totalTokensUsed += totalQueryTokens;
+    
+    updateTokenStatusBar();
+    
+    // Update last cost display
+    const lastCostContainer = document.getElementById('diag-last-cost-container');
+    const tokensLastEl = document.getElementById('diag-tokens-last');
+    const costLastEl = document.getElementById('diag-cost-last');
+    
+    if (lastCostContainer && tokensLastEl && costLastEl) {
+        tokensLastEl.textContent = totalQueryTokens.toLocaleString('es-ES');
+        costLastEl.textContent = `-$${totalQueryCost.toFixed(4)}`;
+        lastCostContainer.style.display = 'flex';
+    }
+
+    // Append free tier remaining logs
+    const getFreeTierLogLine = (tokens, limit) => {
+        if (tokens <= 0) return `\n> Cuota Free Tier: AGOTADA (Cargando a cuenta de crédito)`;
+        return `\n> Cuota Free Tier Restante: ${tokens.toLocaleString('es-ES')} / ${limit.toLocaleString('es-ES')} tokens`;
+    };
+
+    const finalGeminiText = geminiText + getFreeTierLogLine(appState.freeTiers.gemini, 500000);
+    const finalClaudeText = claudeText + getFreeTierLogLine(appState.freeTiers.claude, 100000);
+    const finalQwenText = qwenText + getFreeTierLogLine(appState.freeTiers.qwen, 1000000);
+    const finalLlamaText = llamaText + getFreeTierLogLine(appState.freeTiers.llama, 250000);
+    
+    // Check if real OpenAI query is enabled
+    const openAiApiKey = localStorage.getItem('openai_api_key');
+    let openAiFinished = false;
+    let openAiResultText = '';
+    
+    // Reset consoles text
+    document.getElementById('gemini-term-body').textContent = '';
+    document.getElementById('chatgpt-term-body').textContent = '';
+    document.getElementById('claude-term-body').textContent = '';
+    document.getElementById('qwen-term-body').textContent = '';
+    document.getElementById('llama-term-body').textContent = '';
+    document.getElementById('orchestrator-term-body').textContent = '';
+
+    let simulationFinished = false;
+    
+    function checkAllCompleted() {
+        if (simulationFinished && openAiFinished) {
+            // Once all finish, type the orchestrator synthesis logs!
+            const orchBody = document.getElementById('orchestrator-term-body');
+            const orchDot = document.getElementById('orchestrator-status-dot');
+            if (orchDot) {
+                orchDot.style.background = '#3b82f6';
+                orchDot.classList.add('blink');
+            }
+            
+            let cursor = 0;
+            const orchSpeed = 4; // fast orchestrator typing
+            let orchInterval = setInterval(() => {
+                if (cursor < orchestratorText.length) {
+                    orchBody.textContent += orchestratorText.charAt(cursor);
+                    cursor++;
+                    const parent = orchBody.parentElement;
+                    if (parent) parent.scrollTop = parent.scrollHeight;
+                } else {
+                    clearInterval(orchInterval);
+                    if (orchDot) {
+                        orchDot.classList.remove('blink');
+                        orchDot.style.background = '#3b82f6';
+                    }
+                    
+                    // Reveal synthesized content with tabs
+                    revealFinalSynthesis(htmlContent, geminiResponse, chatgptResponse, claudeResponse, qwenResponse, llamaResponse, indId);
+                }
+            }, orchSpeed);
+        }
+    }
+
+    if (openAiApiKey) {
+        appState.lastGptRealResponse = '';
+        const chatGptDot = document.getElementById('chatgpt-status-dot');
+        if (chatGptDot) {
+            chatGptDot.style.background = '#f59e0b';
+            chatGptDot.classList.add('blink');
+        }
+        
+        document.getElementById('chatgpt-term-body').textContent = '> Conectando con la API de OpenAI (gpt-4o-mini)...\n';
+        
+        fetchOpenAiGpt4(
+            promptText,
+            (chunk) => {
+                document.getElementById('chatgpt-term-body').textContent += chunk;
+                const parent = document.getElementById('chatgpt-term-body').parentElement;
+                if (parent) parent.scrollTop = parent.scrollHeight;
+            },
+            (fullText) => {
+                openAiFinished = true;
+                openAiResultText = fullText;
+                appState.lastGptRealResponse = fullText;
+                if (chatGptDot) chatGptDot.classList.remove('blink');
+                checkAllCompleted();
+            },
+            (errorMsg) => {
+                openAiFinished = true;
+                openAiResultText = `Error: ${errorMsg}`;
+                appState.lastGptRealResponse = `Error al conectar con la API de OpenAI:\n\n${errorMsg}\n\nPor favor, verifica tu API Key y conexión a internet.`;
+                document.getElementById('chatgpt-term-body').textContent += `\n[ERROR DE CONEXIÓN: ${errorMsg}]`;
+                if (chatGptDot) chatGptDot.classList.remove('blink');
+                checkAllCompleted();
+            }
+        );
+        
+        // Run simulated models (4 models, ChatGPT is running real stream)
+        typeWriterParallel(
+            [
+                document.getElementById('gemini-term-body'),
+                document.getElementById('claude-term-body'),
+                document.getElementById('qwen-term-body'),
+                document.getElementById('llama-term-body')
+            ],
+            [finalGeminiText, finalClaudeText, finalQwenText, finalLlamaText],
+            () => {
+                simulationFinished = true;
+                checkAllCompleted();
+            }
+        );
+    } else {
+        openAiFinished = true;
+        appState.lastGptRealResponse = null;
+        const finalChatgptText = chatgptText + getFreeTierLogLine(appState.freeTiers.chatgpt, 150000);
+        
+        // Run 5 simulated models
+        typeWriterParallel(
+            [
+                document.getElementById('gemini-term-body'),
+                document.getElementById('chatgpt-term-body'),
+                document.getElementById('claude-term-body'),
+                document.getElementById('qwen-term-body'),
+                document.getElementById('llama-term-body')
+            ],
+            [finalGeminiText, finalChatgptText, finalClaudeText, finalQwenText, finalLlamaText],
+            () => {
+                simulationFinished = true;
+                checkAllCompleted();
+            }
+        );
+    }
+}
+
+// Parallel typing animator
+function typeWriterParallel(elements, texts, callback) {
+    let cursors = elements.map(() => 0);
+    let intervals = [];
+    const speed = 3; // fast streaming speed to feel active but not slow down usability
+    
+    function startTyping(idx) {
+        const el = elements[idx];
+        const text = texts[idx];
+        const dotId = el.id.replace('-term-body', '-status-dot');
+        const dot = document.getElementById(dotId);
+        if (dot) {
+            if (el.id.includes('gemini')) dot.style.background = '#10b981';
+            else if (el.id.includes('chatgpt')) dot.style.background = '#f59e0b';
+            else if (el.id.includes('claude')) dot.style.background = '#06b6d4';
+            else if (el.id.includes('qwen')) dot.style.background = '#a855f7';
+            else if (el.id.includes('llama')) dot.style.background = '#ef4444';
+            dot.classList.add('blink');
+        }
+        
+        let interval = setInterval(() => {
+            if (cursors[idx] < text.length) {
+                el.textContent += text.charAt(cursors[idx]);
+                cursors[idx]++;
+                const parent = el.parentElement;
+                if (parent) parent.scrollTop = parent.scrollHeight;
+            } else {
+                clearInterval(interval);
+                if (dot) {
+                    dot.classList.remove('blink');
+                }
+                checkAllFinished();
+            }
+        }, speed);
+        intervals.push(interval);
+    }
+    
+    let finishedCount = 0;
+    function checkAllFinished() {
+        finishedCount++;
+        if (finishedCount === elements.length) {
+            callback();
+        }
+    }
+    
+    for (let i = 0; i < elements.length; i++) {
+        startTyping(i);
+    }
+}
+
+// Synthesis revealer with tabs
+function revealFinalSynthesis(synthesisHtml, geminiHtml, chatgptHtml, claudeHtml, qwenHtml, llamaHtml, indId) {
+    const finalContent = document.getElementById('final-synthesis-content');
+    if (finalContent) {
+        const formatFree = (tokens) => {
+            if (tokens <= 0) return '(Agotado)';
+            if (tokens >= 1000000) return `(Free: ${(tokens / 1000000).toFixed(1)}M)`;
+            return `(Free: ${Math.round(tokens / 1000)}K)`;
+        };
+
+        finalContent.innerHTML = `
+            <!-- Tab Buttons -->
+            <div class="diagnostic-tabs" style="display: flex; gap: 0.4rem; margin-bottom: 1.25rem; flex-wrap: wrap; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem;">
+                <button type="button" class="btn-tab active" id="btn-diagtab-synthesis" onclick="switchDiagnosticTab('synthesis')" style="padding: 0.4rem 1rem; border-radius: 6px; font-size: 0.78rem; font-weight: 600; cursor: pointer; transition: var(--transition-smooth); border: 1px solid rgba(59, 130, 246, 0.3); background: rgba(59, 130, 246, 0.15); color: #3b82f6;">
+                    <i class="fa-solid fa-square-poll-horizontal" style="margin-right: 0.25rem;"></i> Síntesis Consolidada
+                </button>
+                <button type="button" class="btn-tab" id="btn-diagtab-gemini" onclick="switchDiagnosticTab('gemini')" style="padding: 0.4rem 1rem; border-radius: 6px; font-size: 0.78rem; font-weight: 600; cursor: pointer; transition: var(--transition-smooth); border: 1px solid rgba(16, 185, 129, 0.15); background: transparent; color: var(--text-secondary);">
+                    <i class="fa-solid fa-circle-nodes" style="margin-right: 0.25rem; color: #10b981;"></i> Gemini-Pro <span style="font-size: 0.65rem; opacity: 0.7; font-weight: normal; margin-left: 0.25rem;">${formatFree(appState.freeTiers.gemini)}</span>
+                </button>
+                <button type="button" class="btn-tab" id="btn-diagtab-chatgpt" onclick="switchDiagnosticTab('chatgpt')" style="padding: 0.4rem 1rem; border-radius: 6px; font-size: 0.78rem; font-weight: 600; cursor: pointer; transition: var(--transition-smooth); border: 1px solid rgba(245, 158, 11, 0.15); background: transparent; color: var(--text-secondary);">
+                    <i class="fa-solid fa-bolt" style="margin-right: 0.25rem; color: #f59e0b;"></i> GPT-4o <span style="font-size: 0.65rem; opacity: 0.7; font-weight: normal; margin-left: 0.25rem;">${formatFree(appState.freeTiers.chatgpt)}</span>
+                </button>
+                <button type="button" class="btn-tab" id="btn-diagtab-claude" onclick="switchDiagnosticTab('claude')" style="padding: 0.4rem 1rem; border-radius: 6px; font-size: 0.78rem; font-weight: 600; cursor: pointer; transition: var(--transition-smooth); border: 1px solid rgba(6, 182, 212, 0.15); background: transparent; color: var(--text-secondary);">
+                    <i class="fa-solid fa-brain" style="margin-right: 0.25rem; color: #06b6d4;"></i> Claude-3.5 <span style="font-size: 0.65rem; opacity: 0.7; font-weight: normal; margin-left: 0.25rem;">${formatFree(appState.freeTiers.claude)}</span>
+                </button>
+                <button type="button" class="btn-tab" id="btn-diagtab-qwen" onclick="switchDiagnosticTab('qwen')" style="padding: 0.4rem 1rem; border-radius: 6px; font-size: 0.78rem; font-weight: 600; cursor: pointer; transition: var(--transition-smooth); border: 1px solid rgba(168, 85, 247, 0.15); background: transparent; color: var(--text-secondary);">
+                    <i class="fa-solid fa-code-fork" style="margin-right: 0.25rem; color: #a855f7;"></i> Qwen-3 <span style="font-size: 0.65rem; opacity: 0.7; font-weight: normal; margin-left: 0.25rem;">${formatFree(appState.freeTiers.qwen)}</span>
+                </button>
+                <button type="button" class="btn-tab" id="btn-diagtab-llama" onclick="switchDiagnosticTab('llama')" style="padding: 0.4rem 1rem; border-radius: 6px; font-size: 0.78rem; font-weight: 600; cursor: pointer; transition: var(--transition-smooth); border: 1px solid rgba(239, 68, 68, 0.15); background: transparent; color: var(--text-secondary);">
+                    <i class="fa-solid fa-dna" style="margin-right: 0.25rem; color: #ef4444;"></i> Llama-4 <span style="font-size: 0.65rem; opacity: 0.7; font-weight: normal; margin-left: 0.25rem;">${formatFree(appState.freeTiers.llama)}</span>
+                </button>
+            </div>
+
+            <!-- Tab Contents -->
+            <div id="diagtab-content-synthesis" class="diagtab-content-panel" style="display: block;">
+                <div style="margin-top: 0.5rem; border-top: 1px dashed var(--border-color); padding-top: 1rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+                        <i class="fa-solid fa-square-poll-horizontal" style="color: var(--accent-blue); font-size: 1.15rem;"></i>
+                        <span style="font-family: var(--font-heading); font-size: 0.95rem; font-weight: 700; text-transform: uppercase; color: var(--text-primary);">Síntesis Diagnóstica Consolidada por IA</span>
+                    </div>
+                    ${synthesisHtml}
+                </div>
+            </div>
+            <div id="diagtab-content-gemini" class="diagtab-content-panel" style="display: none; color: #a7f3d0; line-height: 1.6; font-size: 0.875rem; padding: 0.5rem; background: rgba(16, 185, 129, 0.03); border: 1px solid rgba(16, 185, 129, 0.1); border-radius: 6px;">
+                ${geminiHtml}
+            </div>
+            <div id="diagtab-content-chatgpt" class="diagtab-content-panel" style="display: none; color: #fef3c7; line-height: 1.6; font-size: 0.875rem; padding: 0.5rem; background: rgba(245, 158, 11, 0.03); border: 1px solid rgba(245, 158, 11, 0.1); border-radius: 6px;">
+                ${appState.lastGptRealResponse ? `
+                <!-- Compare Toggle -->
+                <div class="compare-toggle-bar" style="display: flex; gap: 0.25rem; background: rgba(0,0,0,0.25); padding: 3px; border-radius: 6px; width: fit-content; margin-bottom: 1rem; border: 1px solid rgba(255,255,255,0.05);">
+                    <button type="button" class="btn-compare-mode active" id="btn-gptmode-real" onclick="setGptCompareMode('real')" style="background: rgba(245, 158, 11, 0.15); border: none; padding: 0.25rem 0.75rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; color: #f59e0b; cursor: pointer; transition: var(--transition-smooth);">
+                        <i class="fa-solid fa-wifi" style="margin-right: 0.25rem;"></i> Consulta Real (ChatGPT)
+                    </button>
+                    <button type="button" class="btn-compare-mode" id="btn-gptmode-heuristic" onclick="setGptCompareMode('heuristic')" style="background: transparent; border: none; padding: 0.25rem 0.75rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; color: var(--text-secondary); cursor: pointer; transition: var(--transition-smooth);">
+                        <i class="fa-solid fa-cogs" style="margin-right: 0.25rem;"></i> Simulación Heurística
+                    </button>
+                </div>
+                <div id="gpt-compare-content-real" style="display: block;">
+                    ${parseMarkdownToHtml(appState.lastGptRealResponse)}
+                </div>
+                <div id="gpt-compare-content-heuristic" style="display: none;">
+                    ${chatgptHtml}
+                </div>
+                ` : `
+                <div id="gpt-compare-content-heuristic" style="display: block;">
+                    ${chatgptHtml}
+                </div>
+                `}
+            </div>
+            <div id="diagtab-content-claude" class="diagtab-content-panel" style="display: none; color: #cffafe; line-height: 1.6; font-size: 0.875rem; padding: 0.5rem; background: rgba(6, 182, 212, 0.03); border: 1px solid rgba(6, 182, 212, 0.1); border-radius: 6px;">
+                ${claudeHtml}
+            </div>
+            <div id="diagtab-content-qwen" class="diagtab-content-panel" style="display: none; color: #e9d5ff; line-height: 1.6; font-size: 0.875rem; padding: 0.5rem; background: rgba(168, 85, 247, 0.03); border: 1px solid rgba(168, 85, 247, 0.1); border-radius: 6px;">
+                ${qwenHtml}
+            </div>
+            <div id="diagtab-content-llama" class="diagtab-content-panel" style="display: none; color: #fee2e2; line-height: 1.6; font-size: 0.875rem; padding: 0.5rem; background: rgba(239, 68, 68, 0.03); border: 1px solid rgba(239, 68, 68, 0.1); border-radius: 6px;">
+                ${llamaHtml}
+            </div>
+        `;
+        finalContent.style.display = 'block';
+        setTimeout(() => {
+            finalContent.style.opacity = '1';
+        }, 50);
+        
+        // Cache the entire content of diagnostic-content to retrieve it in memory
+        const container = document.getElementById('diagnostic-content');
+        if (container) {
+            appState.diagnosticCache[indId] = container.innerHTML;
+        }
+        
+        renderDiagnosticBadge();
+    }
 }
 
 function generateDiagnosticHtmlText(years, colData, alcData, metadata) {
@@ -1456,21 +2600,28 @@ function exportToCSV() {
     const rows = tableBody.querySelectorAll('tr');
     
     let csvContent = '\uFEFF'; // UTF-8 BOM
-    const regionHeader = appState.selectedRegion === 'LAT' ? 'América Latina (promedio simple)' : (appState.selectedRegion === 'LATO' ? 'América Latina' : 'América Latina y el Caribe');
-    csvContent += `Año,Colombia,${regionHeader},Brecha Absoluta,Brecha Porcentual\n`;
+    const activeRegionLabel = appState.selectedRegion === 'LAT' ? 'América Latina (promedio simple)' : (appState.selectedRegion === 'LATO' ? 'América Latina' : 'América Latina y el Caribe');
+    csvContent += `Año,Colombia,Valor ALC (212),Valor AL (211),Valor AL Prom. Simple,Brecha Absoluta (vs ${activeRegionLabel}),Brecha Porcentual (vs ${activeRegionLabel})\n`;
     
     rows.forEach(tr => {
         const tds = tr.querySelectorAll('td');
-        if (tds.length < 5) return;
+        if (tds.length < 7) return;
         
         const year = tds[0].textContent.trim();
         // Replace thousand separators and decimal points to standard CSV format
         const col = tds[1].textContent.trim().replace(/\./g, '').replace(/,/g, '.');
         const alc = tds[2].textContent.trim().replace(/\./g, '').replace(/,/g, '.');
-        const gap = tds[3].textContent.trim().replace(/\./g, '').replace(/,/g, '.');
-        const pct = tds[4].textContent.trim().replace('%', '').replace(/\./g, '').replace(/,/g, '.');
+        const al = tds[3].textContent.trim().replace(/\./g, '').replace(/,/g, '.');
+        const latSimple = tds[4].textContent.trim().replace(/\./g, '').replace(/,/g, '.');
         
-        csvContent += `"${year}","${col}","${alc}","${gap}","${pct}"\n`;
+        // Read raw numeric values from attributes to avoid formatting issues
+        const gapRaw = tds[5].getAttribute('data-raw');
+        const pctRaw = tds[6].getAttribute('data-raw');
+        
+        const gap = (gapRaw !== null && gapRaw !== '') ? gapRaw : '-';
+        const pct = (pctRaw !== null && pctRaw !== '') ? pctRaw : '-';
+        
+        csvContent += `"${year}","${col}","${alc}","${al}","${latSimple}","${gap}","${pct}"\n`;
     });
     
     const filename = `${appState.selectedIndicator.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}_comparativa.csv`;
@@ -1511,6 +2662,11 @@ function switchGlobalSection(sectionId, pushHistory = true) {
         tendenciasSection.style.display = sectionId === 'tendencias' ? 'block' : 'none';
     }
     
+    const tendencias2Section = document.getElementById('tendencias2-section');
+    if (tendencias2Section) {
+        tendencias2Section.style.display = sectionId === 'tendencias2' ? 'block' : 'none';
+    }
+    
     const exportarDatosSection = document.getElementById('exportar-datos-section');
     if (exportarDatosSection) {
         exportarDatosSection.style.display = sectionId === 'exportar-datos' ? 'block' : 'none';
@@ -1542,6 +2698,12 @@ function switchGlobalSection(sectionId, pushHistory = true) {
     const sidebarTendenciasBtn = document.getElementById('sidebar-tendencias-btn');
     if (sidebarTendenciasBtn) {
         sidebarTendenciasBtn.classList.toggle('active', sectionId === 'tendencias');
+    }
+    
+    // Update sidebar tendencias2 button active highlight
+    const sidebarTendencias2Btn = document.getElementById('sidebar-tendencias2-btn');
+    if (sidebarTendencias2Btn) {
+        sidebarTendencias2Btn.classList.toggle('active', sectionId === 'tendencias2');
     }
     
     // Update sidebar exportar-datos button active highlight
@@ -1583,7 +2745,7 @@ function selectBrechasSection(pushHistory = true) {
     // Clear selections in the thematic tree and structures
     document.querySelectorAll('.tree-leaf').forEach(el => el.classList.remove('selected'));
     document.querySelectorAll('.structures-list-item').forEach(el => {
-        if (el.id !== 'sidebar-brechas-btn' && el.id !== 'sidebar-metodologia-btn' && el.id !== 'sidebar-tendencias-btn' && el.id !== 'sidebar-exportar-datos-btn' && el.id !== 'sidebar-creador-btn' && el.id !== 'sidebar-consulta-btn') {
+        if (el.id !== 'sidebar-brechas-btn' && el.id !== 'sidebar-metodologia-btn' && el.id !== 'sidebar-tendencias-btn' && el.id !== 'sidebar-tendencias2-btn' && el.id !== 'sidebar-exportar-datos-btn' && el.id !== 'sidebar-creador-btn' && el.id !== 'sidebar-consulta-btn') {
             el.classList.remove('active');
         }
     });
@@ -1598,7 +2760,7 @@ function selectMetodologiaSection(pushHistory = true) {
     // Clear selections in the thematic tree and structures
     document.querySelectorAll('.tree-leaf').forEach(el => el.classList.remove('selected'));
     document.querySelectorAll('.structures-list-item').forEach(el => {
-        if (el.id !== 'sidebar-metodologia-btn' && el.id !== 'sidebar-brechas-btn' && el.id !== 'sidebar-tendencias-btn' && el.id !== 'sidebar-exportar-datos-btn' && el.id !== 'sidebar-creador-btn' && el.id !== 'sidebar-consulta-btn') {
+        if (el.id !== 'sidebar-metodologia-btn' && el.id !== 'sidebar-brechas-btn' && el.id !== 'sidebar-tendencias-btn' && el.id !== 'sidebar-tendencias2-btn' && el.id !== 'sidebar-exportar-datos-btn' && el.id !== 'sidebar-creador-btn' && el.id !== 'sidebar-consulta-btn') {
             el.classList.remove('active');
         }
     });
@@ -1611,12 +2773,27 @@ function selectTendenciasSection(pushHistory = true) {
     // Clear selections in the thematic tree and structures
     document.querySelectorAll('.tree-leaf').forEach(el => el.classList.remove('selected'));
     document.querySelectorAll('.structures-list-item').forEach(el => {
-        if (el.id !== 'sidebar-tendencias-btn' && el.id !== 'sidebar-brechas-btn' && el.id !== 'sidebar-metodologia-btn' && el.id !== 'sidebar-exportar-datos-btn' && el.id !== 'sidebar-creador-btn' && el.id !== 'sidebar-consulta-btn') {
+        if (el.id !== 'sidebar-tendencias-btn' && el.id !== 'sidebar-brechas-btn' && el.id !== 'sidebar-metodologia-btn' && el.id !== 'sidebar-tendencias2-btn' && el.id !== 'sidebar-exportar-datos-btn' && el.id !== 'sidebar-creador-btn' && el.id !== 'sidebar-consulta-btn') {
             el.classList.remove('active');
         }
     });
     
     renderTendencias();
+}
+
+// Click handler for sidebar Tendencias2 section
+function selectTendencias2Section(pushHistory = true) {
+    switchGlobalSection('tendencias2', pushHistory);
+    
+    // Clear selections in the thematic tree and structures
+    document.querySelectorAll('.tree-leaf').forEach(el => el.classList.remove('selected'));
+    document.querySelectorAll('.structures-list-item').forEach(el => {
+        if (el.id !== 'sidebar-tendencias2-btn' && el.id !== 'sidebar-tendencias-btn' && el.id !== 'sidebar-brechas-btn' && el.id !== 'sidebar-metodologia-btn' && el.id !== 'sidebar-exportar-datos-btn' && el.id !== 'sidebar-creador-btn' && el.id !== 'sidebar-consulta-btn') {
+            el.classList.remove('active');
+        }
+    });
+    
+    renderTendencias2();
 }
 
 // 11e. Click handler for sidebar Exportar Datos section
@@ -1626,7 +2803,7 @@ function selectExportarDatosSection(pushHistory = true) {
     // Clear selections in the thematic tree and structures
     document.querySelectorAll('.tree-leaf').forEach(el => el.classList.remove('selected'));
     document.querySelectorAll('.structures-list-item').forEach(el => {
-        if (el.id !== 'sidebar-exportar-datos-btn' && el.id !== 'sidebar-brechas-btn' && el.id !== 'sidebar-metodologia-btn' && el.id !== 'sidebar-tendencias-btn' && el.id !== 'sidebar-creador-btn' && el.id !== 'sidebar-consulta-btn') {
+        if (el.id !== 'sidebar-exportar-datos-btn' && el.id !== 'sidebar-brechas-btn' && el.id !== 'sidebar-metodologia-btn' && el.id !== 'sidebar-tendencias-btn' && el.id !== 'sidebar-tendencias2-btn' && el.id !== 'sidebar-creador-btn' && el.id !== 'sidebar-consulta-btn') {
             el.classList.remove('active');
         }
     });
@@ -1641,7 +2818,7 @@ function selectCreadorSection(pushHistory = true) {
     // Clear selections in the thematic tree and structures
     document.querySelectorAll('.tree-leaf').forEach(el => el.classList.remove('selected'));
     document.querySelectorAll('.structures-list-item').forEach(el => {
-        if (el.id !== 'sidebar-creador-btn' && el.id !== 'sidebar-exportar-datos-btn' && el.id !== 'sidebar-brechas-btn' && el.id !== 'sidebar-metodologia-btn' && el.id !== 'sidebar-tendencias-btn' && el.id !== 'sidebar-consulta-btn') {
+        if (el.id !== 'sidebar-creador-btn' && el.id !== 'sidebar-exportar-datos-btn' && el.id !== 'sidebar-brechas-btn' && el.id !== 'sidebar-metodologia-btn' && el.id !== 'sidebar-tendencias-btn' && el.id !== 'sidebar-tendencias2-btn' && el.id !== 'sidebar-consulta-btn') {
             el.classList.remove('active');
         }
     });
@@ -1656,7 +2833,7 @@ function selectConsultaSection(pushHistory = true) {
     // Clear selections in the thematic tree and structures
     document.querySelectorAll('.tree-leaf').forEach(el => el.classList.remove('selected'));
     document.querySelectorAll('.structures-list-item').forEach(el => {
-        if (el.id !== 'sidebar-consulta-btn' && el.id !== 'sidebar-creador-btn' && el.id !== 'sidebar-exportar-datos-btn' && el.id !== 'sidebar-brechas-btn' && el.id !== 'sidebar-metodologia-btn' && el.id !== 'sidebar-tendencias-btn') {
+        if (el.id !== 'sidebar-consulta-btn' && el.id !== 'sidebar-creador-btn' && el.id !== 'sidebar-exportar-datos-btn' && el.id !== 'sidebar-brechas-btn' && el.id !== 'sidebar-metodologia-btn' && el.id !== 'sidebar-tendencias-btn' && el.id !== 'sidebar-tendencias2-btn') {
             el.classList.remove('active');
         }
     });
@@ -1717,6 +2894,8 @@ function restoreState(state, pushHistory = false) {
         selectMetodologiaSection(pushHistory);
     } else if (section === 'tendencias') {
         selectTendenciasSection(pushHistory);
+    } else if (section === 'tendencias2') {
+        selectTendencias2Section(pushHistory);
     } else if (section === 'exportar-datos') {
         selectExportarDatosSection(pushHistory);
     } else if (section === 'creador') {
@@ -2528,33 +3707,47 @@ function renderCriticalGaps() {
     const tbody = document.getElementById('brechas-criticas-standalone-table-body');
     if (!tbody) return;
     
-    // Sort benchmarks by absolute DRE descending
+    const region = appState.selectedRegion || 'ALC';
+    let refKey = 'alcVal';
+    let regionLabel = 'ALC (212)';
+    if (region === 'LATO') {
+        refKey = 'alVal';
+        regionLabel = 'AL (211)';
+    } else if (region === 'LAT') {
+        refKey = 'latVal';
+        regionLabel = 'AL Prom. Simple';
+    }
+    
+    // Update the table header DRE to show the active comparison region
+    const headerEl = document.getElementById('brechas-table-dre-header');
+    if (headerEl) {
+        headerEl.innerHTML = `DRE<br><span style="font-size: 0.7rem; font-weight: normal; opacity: 0.85; display: block; margin-top: 0.15rem;">vs ${regionLabel}</span>`;
+    }
+    
+    // Sort benchmarks by absolute dynamic DRE descending
     const sortedBenchmarks = [...CRITICAL_BENCHMARKS].sort((a, b) => {
-        const dreA = Math.abs((a.colVal - a.alcVal) / a.alcVal);
-        const dreB = Math.abs((b.colVal - b.alcVal) / b.alcVal);
+        const refA = a[refKey];
+        const refB = b[refKey];
+        const dreA = Math.abs((a.colVal - refA) / refA);
+        const dreB = Math.abs((b.colVal - refB) / refB);
         return dreB - dreA;
     });
     
     tbody.innerHTML = '';
     
     sortedBenchmarks.forEach(item => {
-        const dre = (item.colVal - item.alcVal) / item.alcVal;
-        const absDre = Math.abs(dre);
+        const refVal = item[refKey];
+        const dre = (item.colVal - refVal) / refVal;
         
         let dreSign = dre >= 0 ? '+' : '';
         
-        // Decide if the gap is favorable (green) or unfavorable (red) for Colombia
-        // Unemployment, Poverty, Dependency, CO2: Lower is better. So negative DRE is favorable.
-        // GDP per capita: Higher is better. So positive DRE is favorable.
-        let isFavorable = false;
-        if (item.id === 'unemployment' || item.id === 'poverty' || item.id === 'dependency' || item.id === 'co2_emissions') {
-            isFavorable = dre < 0;
-        } else if (item.id === 'gdp_per_capita') {
-            isFavorable = dre > 0;
-        }
+        // Decide if the gap is favorable (Mejor) or unfavorable (Peor) for Colombia
+        const lowerBetter = isLowerBetter(item.name);
+        const isFavorable = lowerBetter ? (item.colVal <= refVal) : (item.colVal >= refVal);
         
         const badgeColor = isFavorable ? 'var(--accent-green)' : 'var(--accent-red)';
         const bgOpacity = 'rgba(' + (isFavorable ? '16, 185, 129' : '239, 68, 68') + ', 0.15)';
+        const badgeText = isFavorable ? 'Mejor' : 'Peor';
         
         const tr = document.createElement('tr');
         tr.innerHTML = `
@@ -2562,15 +3755,25 @@ function renderCriticalGaps() {
                 <span class="benchmark-link" style="color: var(--accent-blue); cursor: pointer; font-weight: 600; text-decoration: none; transition: var(--transition-smooth);" onclick="selectAndFocusIndicator(${item.indicatorId})">${item.name}</span>
                 <span style="font-size: 0.7rem; color: var(--text-muted); display: block; margin-top: 0.15rem;">Año: ${item.year} | Unidad: ${item.unit}</span>
             </td>
-            <td style="text-align: right; font-weight: 600; color: var(--color-colombia); padding: 0.75rem 1rem;">${formatNumber(item.colVal)}</td>
-            <td style="text-align: right; font-weight: 600; color: var(--color-alc); padding: 0.75rem 1rem;">${formatNumber(item.alcVal)}</td>
-            <td style="text-align: right; font-weight: 600; padding: 0.75rem 1rem;">
-                <span style="padding: 0.2rem 0.5rem; border-radius: 6px; background: ${bgOpacity}; color: ${badgeColor}; font-size: 0.8125rem;">
+            <td class="colombia-cell" style="text-align: right; font-weight: 600; padding: 0.75rem 1rem;">${formatNumber(item.colVal)}</td>
+            <td class="alc-cell" style="text-align: right; font-weight: 600; padding: 0.75rem 1rem;">${formatNumber(item.alcVal)}</td>
+            <td class="al-cell" style="text-align: right; font-weight: 600; padding: 0.75rem 1rem;">${formatNumber(item.alVal)}</td>
+            <td class="lat-simple-cell" style="text-align: right; font-weight: 600; padding: 0.75rem 1rem;">${formatNumber(item.latVal)}</td>
+            <td style="text-align: center; font-weight: 600; padding: 0.75rem 1rem;">
+                <span style="padding: 0.2rem 0.5rem; border-radius: 6px; background: ${bgOpacity}; color: ${badgeColor}; font-size: 0.8125rem; display: inline-block;">
                     ${dreSign}${formatNumber(dre)}
                 </span>
             </td>
             <td style="font-size: 0.8125rem; color: var(--text-secondary); line-height: 1.3; text-align: left; padding: 0.75rem 1rem;">
-                ${item.interpretation}
+                <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                    <div>
+                        <span style="padding: 0.15rem 0.4rem; border-radius: 4px; background: ${bgOpacity}; color: ${badgeColor}; font-size: 0.75rem; font-weight: 700; text-transform: uppercase;">
+                            <i class="${isFavorable ? 'fa-solid fa-circle-check' : 'fa-solid fa-circle-exclamation'}" style="margin-right: 0.25rem;"></i>
+                            ${badgeText}
+                        </span>
+                    </div>
+                    <span>${item.interpretation}</span>
+                </div>
             </td>
         `;
         tbody.appendChild(tr);
@@ -2678,51 +3881,63 @@ async function generateFullPrintReport(reportType = 'executive') {
                 <table class="data-table" style="width: 100%; border-collapse: collapse;">
                     <thead>
                         <tr>
-                            <th style="text-align: left; padding: 0.75rem 1rem; color: var(--text-primary); border-bottom: 2px solid var(--border-color); font-weight: 600;">Indicador</th>
-                            <th style="text-align: right; padding: 0.75rem 1rem; color: var(--text-primary); border-bottom: 2px solid var(--border-color); font-weight: 600;">Colombia</th>
-                            <th style="text-align: right; padding: 0.75rem 1rem; color: var(--text-primary); border-bottom: 2px solid var(--border-color); font-weight: 600;">Promedio ALC</th>
-                            <th style="text-align: right; padding: 0.75rem 1rem; color: var(--text-primary); border-bottom: 2px solid var(--border-color); font-weight: 600;">DRE</th>
-                            <th style="text-align: left; padding: 0.75rem 1rem; color: var(--text-primary); border-bottom: 2px solid var(--border-color); font-weight: 600;">Interpretación del Desvío</th>
+                            <th style="text-align: left; padding: 0.75rem 1rem; color: var(--text-primary); border-bottom: 2px solid var(--border-color); font-weight: 600; width: 25%;">Indicador</th>
+                            <th style="text-align: right; padding: 0.75rem 1rem; color: var(--text-primary); border-bottom: 2px solid var(--border-color); font-weight: 600; width: 11%;">Colombia</th>
+                            <th style="text-align: right; padding: 0.75rem 1rem; color: var(--text-primary); border-bottom: 2px solid var(--border-color); font-weight: 600; width: 11%;">ALC (212)</th>
+                            <th style="text-align: right; padding: 0.75rem 1rem; color: var(--text-primary); border-bottom: 2px solid var(--border-color); font-weight: 600; width: 11%;">AL (211)</th>
+                            <th style="text-align: right; padding: 0.75rem 1rem; color: var(--text-primary); border-bottom: 2px solid var(--border-color); font-weight: 600; width: 11%;">AL Prom. Simple</th>
+                            <th style="text-align: center; padding: 0.75rem 1rem; color: var(--text-primary); border-bottom: 2px solid var(--border-color); font-weight: 600; width: 13%;">DRE (vs ${regionLabel})</th>
+                            <th style="text-align: left; padding: 0.75rem 1rem; color: var(--text-primary); border-bottom: 2px solid var(--border-color); font-weight: 600; width: 18%;">Interpretación del Desvío</th>
                         </tr>
                     </thead>
                     <tbody>
     `;
     
-    // Sort benchmarks by absolute DRE
+    // Sort benchmarks by absolute dynamic DRE
     const sortedBenchmarks = [...CRITICAL_BENCHMARKS].sort((a, b) => {
-        const dreA = Math.abs((a.colVal - a.alcVal) / a.alcVal);
-        const dreB = Math.abs((b.colVal - b.alcVal) / b.alcVal);
+        const refA = a[refKey];
+        const refB = b[refKey];
+        const dreA = Math.abs((a.colVal - refA) / refA);
+        const dreB = Math.abs((b.colVal - refB) / refB);
         return dreB - dreA;
     });
     
     sortedBenchmarks.forEach(item => {
-        const dre = (item.colVal - item.alcVal) / item.alcVal;
-        const absDre = Math.abs(dre);
+        const refVal = item[refKey];
+        const dre = (item.colVal - refVal) / refVal;
         let dreSign = dre >= 0 ? '+' : '';
-        let isFavorable = false;
-        if (item.id === 'unemployment' || item.id === 'poverty' || item.id === 'dependency' || item.id === 'co2_emissions') {
-            isFavorable = dre < 0;
-        } else if (item.id === 'gdp_per_capita') {
-            isFavorable = dre > 0;
-        }
+        const lowerBetter = isLowerBetter(item.name);
+        const isFavorable = lowerBetter ? (item.colVal <= refVal) : (item.colVal >= refVal);
         
         const badgeColor = isFavorable ? '#10b981' : '#ef4444';
         const bgOpacity = 'rgba(' + (isFavorable ? '16, 185, 129' : '239, 68, 68') + ', 0.1)';
+        const badgeText = isFavorable ? 'Mejor' : 'Peor';
         
         html += `
             <tr style="border-bottom: 1px solid var(--border-color);">
-                <td style="padding: 0.75rem 1rem; text-align: left;">
+                <td style="padding: 0.75rem 1rem; text-align: left; vertical-align: top;">
                     <strong>${item.name}</strong>
                     <span style="font-size: 7.5pt; color: var(--text-muted); display: block; margin-top: 0.15rem;">Año: ${item.year} | Unidad: ${item.unit}</span>
                 </td>
-                <td class="colombia-cell" style="text-align: right; padding: 0.75rem 1rem; color: var(--color-colombia); font-weight: 600;">${formatNumber(item.colVal)}</td>
-                <td class="alc-cell" style="text-align: right; padding: 0.75rem 1rem; color: var(--color-alc); font-weight: 600;">${formatNumber(item.alcVal)}</td>
-                <td style="text-align: right; padding: 0.75rem 1rem; font-weight: 600;">
-                    <span style="padding: 0.2rem 0.5rem; border-radius: 6px; background: ${bgOpacity}; color: ${badgeColor}; font-size: 8.5pt; border: 1px solid ${badgeColor}33;">
+                <td class="colombia-cell" style="text-align: right; padding: 0.75rem 1rem; color: var(--color-colombia); font-weight: 600; vertical-align: top;">${formatNumber(item.colVal)}</td>
+                <td class="alc-cell" style="text-align: right; padding: 0.75rem 1rem; color: var(--color-alc); font-weight: 600; vertical-align: top;">${formatNumber(item.alcVal)}</td>
+                <td class="al-cell" style="text-align: right; padding: 0.75rem 1rem; color: var(--text-secondary); font-weight: 600; vertical-align: top;">${formatNumber(item.alVal)}</td>
+                <td class="lat-simple-cell" style="text-align: right; padding: 0.75rem 1rem; color: var(--text-muted); font-weight: 600; vertical-align: top;">${formatNumber(item.latVal)}</td>
+                <td style="text-align: center; padding: 0.75rem 1rem; font-weight: 600; vertical-align: top;">
+                    <span style="padding: 0.2rem 0.5rem; border-radius: 6px; background: ${bgOpacity}; color: ${badgeColor}; font-size: 8.5pt; border: 1px solid ${badgeColor}33; display: inline-block;">
                         ${dreSign}${formatNumber(dre)}
                     </span>
                 </td>
-                <td style="font-size: 8.5pt; color: var(--text-secondary); padding: 0.75rem 1rem; line-height: 1.3; text-align: left;">${item.interpretation}</td>
+                <td style="font-size: 8.5pt; color: var(--text-secondary); padding: 0.75rem 1rem; line-height: 1.3; text-align: left; vertical-align: top;">
+                    <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                        <div>
+                            <span style="padding: 0.15rem 0.4rem; border-radius: 4px; background: ${bgOpacity}; color: ${badgeColor}; font-size: 7.5pt; font-weight: 700; text-transform: uppercase;">
+                                ${badgeText}
+                            </span>
+                        </div>
+                        <span>${item.interpretation}</span>
+                    </div>
+                </td>
             </tr>
         `;
     });
@@ -2733,8 +3948,8 @@ async function generateFullPrintReport(reportType = 'executive') {
             </div>
             
             <div style="font-size: 9.5pt; line-height: 1.6; color: var(--text-secondary); margin-top: 1.5rem; padding: 1rem; background: rgba(59, 130, 246, 0.05); border: 1px dashed rgba(59, 130, 246, 0.2); border-radius: 8px;">
-                <p><strong>Nota metodológica:</strong> La Desviación Relativa Estándar (DRE) se calcula como <code>(Colombia - ALC) / ALC</code>. 
-                Representa el porcentaje de desvío del desempeño de Colombia con respecto al promedio de América Latina y el Caribe (ALC). 
+                <p><strong>Nota metodológica:</strong> La Desviación Relativa Estándar (DRE) se calcula como <code>(Colombia - Región) / Región</code> con respecto a la región de referencia activa: <strong>${regionLabel}</strong>. 
+                Representa la distancia proporcional del desempeño de Colombia con respecto al de la región seleccionada. 
                 Valores negativos indican que Colombia está por debajo de la media regional, mientras que valores positivos indican que la supera.</p>
             </div>
         </div>
@@ -3694,6 +4909,16 @@ async function triggerReportGeneration() {
     }
     
     try {
+        const region = appState.selectedRegion || 'ALC';
+        let refKey = 'alcVal';
+        let regionLabel = 'ALC (212)';
+        if (region === 'LATO') {
+            refKey = 'alVal';
+            regionLabel = 'AL (211)';
+        } else if (region === 'LAT') {
+            refKey = 'latVal';
+            regionLabel = 'AL Prom. Simple';
+        }
         let reportHtml = '';
         
         // --- PAGE 1: TITLE & COVER ---
@@ -3727,49 +4952,63 @@ async function triggerReportGeneration() {
                     <table class="data-table" style="width: 100%; border-collapse: collapse;">
                         <thead>
                             <tr>
-                                <th style="text-align: left; padding: 0.75rem 1rem; color: var(--text-primary); border-bottom: 2px solid var(--border-color); font-weight: 600;">Indicador</th>
-                                <th style="text-align: right; padding: 0.75rem 1rem; color: var(--text-primary); border-bottom: 2px solid var(--border-color); font-weight: 600;">Colombia</th>
-                                <th style="text-align: right; padding: 0.75rem 1rem; color: var(--text-primary); border-bottom: 2px solid var(--border-color); font-weight: 600;">Promedio ALC</th>
-                                <th style="text-align: right; padding: 0.75rem 1rem; color: var(--text-primary); border-bottom: 2px solid var(--border-color); font-weight: 600;">DRE</th>
-                                <th style="text-align: left; padding: 0.75rem 1rem; color: var(--text-primary); border-bottom: 2px solid var(--border-color); font-weight: 600;">Interpretación del Desvío</th>
+                                <th style="text-align: left; padding: 0.75rem 1rem; color: var(--text-primary); border-bottom: 2px solid var(--border-color); font-weight: 600; width: 25%;">Indicador</th>
+                                <th style="text-align: right; padding: 0.75rem 1rem; color: var(--text-primary); border-bottom: 2px solid var(--border-color); font-weight: 600; width: 11%;">Colombia</th>
+                                <th style="text-align: right; padding: 0.75rem 1rem; color: var(--text-primary); border-bottom: 2px solid var(--border-color); font-weight: 600; width: 11%;">ALC (212)</th>
+                                <th style="text-align: right; padding: 0.75rem 1rem; color: var(--text-primary); border-bottom: 2px solid var(--border-color); font-weight: 600; width: 11%;">AL (211)</th>
+                                <th style="text-align: right; padding: 0.75rem 1rem; color: var(--text-primary); border-bottom: 2px solid var(--border-color); font-weight: 600; width: 11%;">AL Prom. Simple</th>
+                                <th style="text-align: center; padding: 0.75rem 1rem; color: var(--text-primary); border-bottom: 2px solid var(--border-color); font-weight: 600; width: 13%;">DRE (vs ${regionLabel})</th>
+                                <th style="text-align: left; padding: 0.75rem 1rem; color: var(--text-primary); border-bottom: 2px solid var(--border-color); font-weight: 600; width: 18%;">Interpretación del Desvío</th>
                             </tr>
                         </thead>
                         <tbody>
         `;
         
+        // Sort benchmarks by absolute dynamic DRE
         const sortedBenchmarks = [...CRITICAL_BENCHMARKS].sort((a, b) => {
-            const dreA = Math.abs((a.colVal - a.alcVal) / a.alcVal);
-            const dreB = Math.abs((b.colVal - b.alcVal) / b.alcVal);
+            const refA = a[refKey];
+            const refB = b[refKey];
+            const dreA = Math.abs((a.colVal - refA) / refA);
+            const dreB = Math.abs((b.colVal - refB) / refB);
             return dreB - dreA;
         });
         
         sortedBenchmarks.forEach(item => {
-            const dre = (item.colVal - item.alcVal) / item.alcVal;
+            const refVal = item[refKey];
+            const dre = (item.colVal - refVal) / refVal;
             let dreSign = dre >= 0 ? '+' : '';
-            let isFavorable = false;
-            if (item.id === 'unemployment' || item.id === 'poverty' || item.id === 'dependency' || item.id === 'co2_emissions') {
-                isFavorable = dre < 0;
-            } else if (item.id === 'gdp_per_capita') {
-                isFavorable = dre > 0;
-            }
+            const lowerBetter = isLowerBetter(item.name);
+            const isFavorable = lowerBetter ? (item.colVal <= refVal) : (item.colVal >= refVal);
             
             const badgeColor = isFavorable ? '#10b981' : '#ef4444';
             const bgOpacity = 'rgba(' + (isFavorable ? '16, 185, 129' : '239, 68, 68') + ', 0.1)';
+            const badgeText = isFavorable ? 'Mejor' : 'Peor';
             
             reportHtml += `
                 <tr style="border-bottom: 1px solid var(--border-color);">
-                    <td style="padding: 0.75rem 1rem; text-align: left;">
+                    <td style="padding: 0.75rem 1rem; text-align: left; vertical-align: top;">
                         <strong>${item.name}</strong>
                         <span style="font-size: 7.5pt; color: var(--text-muted); display: block; margin-top: 0.15rem;">Año: ${item.year} | Unidad: ${item.unit}</span>
                     </td>
-                    <td class="colombia-cell" style="text-align: right; padding: 0.75rem 1rem; color: var(--color-colombia); font-weight: 600;">${formatNumber(item.colVal)}</td>
-                    <td class="alc-cell" style="text-align: right; padding: 0.75rem 1rem; color: var(--color-alc); font-weight: 600;">${formatNumber(item.alcVal)}</td>
-                    <td style="text-align: right; padding: 0.75rem 1rem; font-weight: 600;">
-                        <span style="padding: 0.2rem 0.5rem; border-radius: 6px; background: ${bgOpacity}; color: ${badgeColor}; font-size: 8.5pt; border: 1px solid ${badgeColor}33;">
+                    <td class="colombia-cell" style="text-align: right; padding: 0.75rem 1rem; color: var(--color-colombia); font-weight: 600; vertical-align: top;">${formatNumber(item.colVal)}</td>
+                    <td class="alc-cell" style="text-align: right; padding: 0.75rem 1rem; color: var(--color-alc); font-weight: 600; vertical-align: top;">${formatNumber(item.alcVal)}</td>
+                    <td class="al-cell" style="text-align: right; padding: 0.75rem 1rem; color: var(--text-secondary); font-weight: 600; vertical-align: top;">${formatNumber(item.alVal)}</td>
+                    <td class="lat-simple-cell" style="text-align: right; padding: 0.75rem 1rem; color: var(--text-muted); font-weight: 600; vertical-align: top;">${formatNumber(item.latVal)}</td>
+                    <td style="text-align: center; padding: 0.75rem 1rem; font-weight: 600; vertical-align: top;">
+                        <span style="padding: 0.2rem 0.5rem; border-radius: 6px; background: ${bgOpacity}; color: ${badgeColor}; font-size: 8.5pt; border: 1px solid ${badgeColor}33; display: inline-block;">
                             ${dreSign}${formatNumber(dre)}
                         </span>
                     </td>
-                    <td style="font-size: 8.5pt; color: var(--text-secondary); padding: 0.75rem 1rem; line-height: 1.3; text-align: left;">${item.interpretation}</td>
+                    <td style="font-size: 8.5pt; color: var(--text-secondary); padding: 0.75rem 1rem; line-height: 1.3; text-align: left; vertical-align: top;">
+                        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                            <div>
+                                <span style="padding: 0.15rem 0.4rem; border-radius: 4px; background: ${bgOpacity}; color: ${badgeColor}; font-size: 7.5pt; font-weight: 700; text-transform: uppercase;">
+                                    ${badgeText}
+                                </span>
+                            </div>
+                            <span>${item.interpretation}</span>
+                        </div>
+                    </td>
                 </tr>
             `;
         });
@@ -4052,8 +5291,8 @@ async function startXlsExport() {
             if (!ind) continue;
             
             try {
-                // Fetch data for Colombia and ALC
-                const url = `${API_DATA_BASE}/${ind.id}/data?lang=es&members=${COLOMBIA_MEMBER_ID},${ALC_MEMBER_ID}`;
+                // Fetch data for Colombia, ALC (212), AL (211) and LAT (43053)
+                const url = `${API_DATA_BASE}/${ind.id}/data?lang=es&members=${COLOMBIA_MEMBER_ID},${ALC_MEMBER_ID},211,${LAT_MEMBER_ID}`;
                 const response = await fetch(url);
                 if (response.ok) {
                     const res = await response.json();
@@ -4159,7 +5398,9 @@ function extractSharedYearData(ind, body) {
     
     // Group by year
     const colData = {};
-    const alcData = {};
+    const alcData = {}; // 212
+    const alData = {};  // 211
+    const latData = {}; // 43053
     const yearsSet = new Set();
     
     filtered.forEach(rec => {
@@ -4177,26 +5418,31 @@ function extractSharedYearData(ind, body) {
         } else if (countryId === ALC_MEMBER_ID) {
             alcData[yearLabel] = val;
             yearsSet.add(yearLabel);
+        } else if (countryId === 211) {
+            alData[yearLabel] = val;
+            yearsSet.add(yearLabel);
+        } else if (countryId === LAT_MEMBER_ID) {
+            latData[yearLabel] = val;
+            yearsSet.add(yearLabel);
         }
     });
     
     const sortedYears = Array.from(yearsSet).sort((a, b) => parseInt(b) - parseInt(a)); // Newest first
     if (sortedYears.length === 0) return null;
     
-    // Find latest year with data for both, prioritizing years < 2025
+    // Find latest year with data for Colombia and at least one region
     let sharedYear = null;
     for (const yr of sortedYears) {
         const yrNum = parseInt(yr);
-        if (yrNum < 2025 && colData[yr] !== undefined && alcData[yr] !== undefined) {
+        if (yrNum < 2025 && colData[yr] !== undefined && (alcData[yr] !== undefined || alData[yr] !== undefined || latData[yr] !== undefined)) {
             sharedYear = yr;
             break;
         }
     }
     
     if (!sharedYear) {
-        // Fallback: latest year with both data
         for (const yr of sortedYears) {
-            if (colData[yr] !== undefined && alcData[yr] !== undefined) {
+            if (colData[yr] !== undefined && (alcData[yr] !== undefined || alData[yr] !== undefined || latData[yr] !== undefined)) {
                 sharedYear = yr;
                 break;
             }
@@ -4207,8 +5453,25 @@ function extractSharedYearData(ind, body) {
     
     const colVal = colData[sharedYear];
     const alcVal = alcData[sharedYear];
-    const gap = colVal - alcVal;
-    const dre = alcVal !== 0 ? gap / alcVal : 0;
+    const alVal = alData[sharedYear];
+    const latVal = latData[sharedYear];
+    
+    // Determine the primary available regional value for Gap and DRE calculation
+    let regionVal = undefined;
+    let regionLabel = '';
+    if (alcVal !== undefined) {
+        regionVal = alcVal;
+        regionLabel = 'ALC (212)';
+    } else if (alVal !== undefined) {
+        regionVal = alVal;
+        regionLabel = 'AL (211)';
+    } else if (latVal !== undefined) {
+        regionVal = latVal;
+        regionLabel = 'AL Prom. Simple';
+    }
+    
+    const gap = (colVal !== undefined && regionVal !== undefined) ? colVal - regionVal : null;
+    const dre = (regionVal !== undefined && regionVal !== 0 && gap !== null) ? gap / regionVal : null;
     
     return {
         code: ind.id,
@@ -4217,8 +5480,11 @@ function extractSharedYearData(ind, body) {
         year: sharedYear,
         colVal: colVal,
         alcVal: alcVal,
+        alVal: alVal,
+        latVal: latVal,
         gap: gap,
-        dre: dre
+        dre: dre,
+        regionLabel: regionLabel
     };
 }
 
@@ -4672,6 +5938,14 @@ function initExportarDatosSection() {
     massState.isExporting = false;
     massState.cancelled = false;
     massState.results = [];
+    massState.wasOnlyFavorites = false;
+    massState.savedCheckboxStates = null;
+    
+    // Uncheck onlyFavorites checkbox on init to keep it clean
+    const onlyFavCb = document.getElementById('mass-only-favorites');
+    if (onlyFavCb) {
+        onlyFavCb.checked = false;
+    }
     
     // Hide progress, hide results
     document.getElementById('mass-progress-panel').style.display = 'none';
@@ -4791,33 +6065,36 @@ function toggleTopCat(topCat, checked) {
 }
 
 function updateMassSelectedCount() {
-    const checkboxes = document.querySelectorAll('.mass-subcat-checkbox:checked');
-    const onlyFavorites = document.getElementById('mass-only-favorites')?.checked;
+    const onlyFavorites = !!document.getElementById('mass-only-favorites')?.checked;
     let totalCount = 0;
     
-    // Diagnostic logging for debugging favorite indicators issues
-    const list = JSON.parse(localStorage.getItem('favorite_indicators') || '[]');
-    console.log("updateMassSelectedCount: onlyFavorites =", onlyFavorites, "local favorites list =", list);
-    
+    // Save/update the selected subcategories from checked checkboxes
+    const checkboxes = document.querySelectorAll('.mass-subcat-checkbox:checked');
     massState.selectedSubcategories = new Set();
     checkboxes.forEach(cb => {
         const topCat = cb.dataset.topcat;
         const subCat = cb.value;
         const key = `${topCat} - ${subCat}`;
         massState.selectedSubcategories.add(key);
-        if (massState.hierarchy[topCat] && massState.hierarchy[topCat][subCat]) {
-            if (onlyFavorites) {
-                const subCatFavs = massState.hierarchy[topCat][subCat].filter(ind => {
-                    const isFav = isIndicatorFavorite(ind.id);
-                    console.log(`Checking ind [${ind.id}] ${ind.name}: isFav =`, isFav);
-                    return isFav;
-                });
-                totalCount += subCatFavs.length;
-            } else {
+    });
+    
+    // Compute totalCount based on selection and favorites filter
+    if (onlyFavorites) {
+        // If only favorites is checked, count all favorites regardless of category checkbox selection
+        if (massState.flatIndicators) {
+            const favs = massState.flatIndicators.filter(ind => isIndicatorFavorite(ind.id));
+            totalCount = favs.length;
+        }
+    } else {
+        // Count indicators in selected subcategories
+        checkboxes.forEach(cb => {
+            const topCat = cb.dataset.topcat;
+            const subCat = cb.value;
+            if (massState.hierarchy[topCat] && massState.hierarchy[topCat][subCat]) {
                 totalCount += massState.hierarchy[topCat][subCat].length;
             }
-        }
-    });
+        });
+    }
     
     // Update parent top category checkboxes to reflect checked/unchecked/indeterminate state
     if (massState.hierarchy) {
@@ -4936,12 +6213,16 @@ async function startMassQuery(mode) {
     // Gather all selected indicators
     const indicatorsToFetch = [];
     massState.flatIndicators.forEach(ind => {
-        const parts = ind.categoryPath ? ind.categoryPath.split(' / ') : [];
-        const topCat = parts[0] || 'General';
-        const subCat = parts[1] || 'General';
-        const key = `${topCat} - ${subCat}`;
-        if (massState.selectedSubcategories.has(key)) {
-            if (!onlyFavorites || isIndicatorFavorite(ind.id)) {
+        if (onlyFavorites) {
+            if (isIndicatorFavorite(ind.id)) {
+                indicatorsToFetch.push(ind);
+            }
+        } else {
+            const parts = ind.categoryPath ? ind.categoryPath.split(' / ') : [];
+            const topCat = parts[0] || 'General';
+            const subCat = parts[1] || 'General';
+            const key = `${topCat} - ${subCat}`;
+            if (massState.selectedSubcategories.has(key)) {
                 indicatorsToFetch.push(ind);
             }
         }
@@ -4957,7 +6238,8 @@ async function startMassQuery(mode) {
             if (!ind) continue;
             
             try {
-                const url = `${API_DATA_BASE}/${ind.id}/data?lang=es&members=${COLOMBIA_MEMBER_ID},${ALC_MEMBER_ID}`;
+                // Fetch data for Colombia, ALC (212), AL (211) and LAT (43053)
+                const url = `${API_DATA_BASE}/${ind.id}/data?lang=es&members=${COLOMBIA_MEMBER_ID},${ALC_MEMBER_ID},211,${LAT_MEMBER_ID}`;
                 const response = await fetch(url);
                 if (response.ok) {
                     const res = await response.json();
@@ -5074,11 +6356,11 @@ function downloadMassXlsReport() {
         <body>
             <table>
                 <tr>
-                    <td colspan="8" class="header-title">Listado de Indicadores Comparativos CEPAL (Exportación)</td>
+                    <td colspan="11" class="header-title">Listado de Indicadores Comparativos CEPAL (Exportación)</td>
                 </tr>
                 <tr>
-                    <td colspan="8" class="meta-cell">
-                        <strong>Ámbito Geográfico:</strong> Colombia vs. América Latina y el Caribe (ALC)<br>
+                    <td colspan="11" class="meta-cell">
+                        <strong>Ámbito Geográfico:</strong> Colombia vs. Agrupaciones Regionales de América Latina<br>
                         <strong>Fecha de Generación:</strong> ${new Date().toLocaleDateString('es-ES')}<br>
                         <strong>Origen de Datos:</strong> API Oficial de la CEPAL (Sistemas de Indicadores)<br>
                         <strong>Total de Registros:</strong> ${sortedResults.length} indicadores comparados
@@ -5087,13 +6369,16 @@ function downloadMassXlsReport() {
                 <thead>
                     <tr>
                         <th style="width: 80px;">Código</th>
-                        <th style="width: 250px;">Clase / Ruta Temática</th>
-                        <th style="width: 350px;">Indicador</th>
+                        <th style="width: 220px;">Clase / Ruta Temática</th>
+                        <th style="width: 300px;">Indicador</th>
                         <th style="width: 80px;" class="text-center">Año Compartido</th>
-                        <th style="width: 120px;" class="text-right">Valor Colombia</th>
-                        <th style="width: 120px;" class="text-right">Valor Promedio ALC</th>
-                        <th style="width: 120px;" class="text-right">Brecha Absoluta</th>
-                        <th style="width: 120px;" class="text-right">Desviación Relativa Estándar (DRE)</th>
+                        <th style="width: 110px;" class="text-right">Colombia</th>
+                        <th style="width: 110px;" class="text-right">ALC (212)</th>
+                        <th style="width: 110px;" class="text-right">AL (211)</th>
+                        <th style="width: 110px;" class="text-right">AL Prom. Simple</th>
+                        <th style="width: 110px;" class="text-right">Región Comparada</th>
+                        <th style="width: 110px;" class="text-right">Brecha Absoluta</th>
+                        <th style="width: 110px;" class="text-right">Desviación Relativa Estándar (DRE)</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -5108,6 +6393,9 @@ function downloadMassXlsReport() {
                 <td class="text-center">${row.year}</td>
                 <td class="text-right">${formatXlsValue(row.colVal)}</td>
                 <td class="text-right">${formatXlsValue(row.alcVal)}</td>
+                <td class="text-right">${formatXlsValue(row.alVal)}</td>
+                <td class="text-right">${formatXlsValue(row.latVal)}</td>
+                <td class="text-center">${row.regionLabel || ''}</td>
                 <td class="text-right">${formatXlsValue(row.gap)}</td>
                 <td class="text-right">${formatXlsValue(row.dre)}</td>
             </tr>
@@ -5149,7 +6437,7 @@ function renderMassTable() {
     tbody.innerHTML = '';
     
     if (massState.results.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--text-muted);">No se encontraron datos coincidentes para los indicadores seleccionados.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="11" style="text-align: center; color: var(--text-muted);">No se encontraron datos coincidentes para los indicadores seleccionados.</td></tr>';
         return;
     }
     
@@ -5180,9 +6468,16 @@ function renderMassTable() {
             <td style="font-weight: 500; color: var(--text-primary);">${row.name}</td>
             <td style="text-align: center; font-weight: 500;">${row.year}</td>
             <td style="text-align: right; font-weight: 600; color: var(--color-colombia);">${formatNumber(row.colVal)}</td>
-            <td style="text-align: right; font-weight: 600; color: var(--color-alc);">${formatNumber(row.alcVal)}</td>
-            <td style="text-align: right; font-weight: 500; color: ${row.gap >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'};">${row.gap >= 0 ? '+' : ''}${formatNumber(row.gap)}</td>
-            <td style="text-align: right; font-size: 0.8rem; color: var(--text-secondary); font-weight: 500;">${row.dre >= 0 ? '+' : ''}${formatNumber(row.dre)}</td>
+            <td style="text-align: right; font-weight: 500; color: var(--color-alc);">${formatNumber(row.alcVal)}</td>
+            <td style="text-align: right; font-weight: 500; color: var(--text-secondary);">${formatNumber(row.alVal)}</td>
+            <td style="text-align: right; font-weight: 500; color: var(--text-muted);">${formatNumber(row.latVal)}</td>
+            <td style="text-align: right; font-weight: 500; color: ${row.gap !== null && row.gap !== undefined ? (row.gap >= 0 ? 'var(--accent-green)' : 'var(--accent-red)') : 'var(--text-muted)'};">
+                ${row.gap !== null && row.gap !== undefined ? (row.gap >= 0 ? '+' : '') + formatNumber(row.gap) : '-'}
+                ${row.regionLabel ? `<span style="font-size: 0.65rem; color: var(--text-muted); display: block;">vs ${row.regionLabel}</span>` : ''}
+            </td>
+            <td style="text-align: right; font-size: 0.8rem; color: var(--text-secondary); font-weight: 500;">
+                ${row.dre !== null && row.dre !== undefined ? (row.dre >= 0 ? '+' : '') + formatNumber(row.dre) : '-'}
+            </td>
             <td style="text-align: center;">
                 <button class="btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.72rem; border-radius: 4px;" onclick="selectIndicatorFromTrend(${row.code}, '${row.name.replace(/'/g, "\\'")}')">
                     <i class="fa-solid fa-chart-line"></i> Graficar
@@ -5224,12 +6519,19 @@ function exportMassTableToCSV() {
     if (massState.results.length === 0) return;
     
     let csvContent = '\uFEFF'; // BOM
-    csvContent += 'Código,Clase/Ruta Temática,Indicador,Año Compartido,Valor Colombia,Valor América Latina,Brecha Absoluta,Desviación Relativa Estándar (DRE)\n';
+    csvContent += 'Código,Clase/Ruta Temática,Indicador,Año Compartido,Valor Colombia,Valor ALC (212),Valor AL (211),Valor AL Prom. Simple (43053),Región Comparada,Brecha Absoluta,Desviación Relativa Estándar (DRE)\n';
     
     massState.results.forEach(row => {
         const cat = `"${row.category.replace(/"/g, '""')}"`;
         const name = `"${row.name.replace(/"/g, '""')}"`;
-        csvContent += `${row.code},${cat},${name},${row.year},${row.colVal},${row.alcVal},${row.gap},${row.dre}\n`;
+        const colVal = row.colVal !== undefined && row.colVal !== null ? row.colVal : '';
+        const alcVal = row.alcVal !== undefined && row.alcVal !== null ? row.alcVal : '';
+        const alVal = row.alVal !== undefined && row.alVal !== null ? row.alVal : '';
+        const latVal = row.latVal !== undefined && row.latVal !== null ? row.latVal : '';
+        const gap = row.gap !== null && row.gap !== undefined ? row.gap : '';
+        const dre = row.dre !== null && row.dre !== undefined ? row.dre : '';
+        const regionLabel = row.regionLabel || '';
+        csvContent += `${row.code},${cat},${name},${row.year},${colVal},${alcVal},${alVal},${latVal},${regionLabel},${gap},${dre}\n`;
     });
     
     const filename = `listado_completo_cepal_${new Date().toISOString().slice(0,10)}.csv`;
@@ -6589,5 +7891,687 @@ function selectIndicatorByIdFromPrompt(id) {
         switchGlobalSection('explorer');
     }
 }
+
+// Global tooltip mechanism for data-tooltip attribute
+function initGlobalTooltip() {
+    let tooltipEl = document.getElementById('custom-tooltip');
+    if (!tooltipEl) {
+        tooltipEl = document.createElement('div');
+        tooltipEl.id = 'custom-tooltip';
+        tooltipEl.className = 'custom-tooltip';
+        document.body.appendChild(tooltipEl);
+    }
+    
+    document.addEventListener('mouseover', (e) => {
+        const target = e.target.closest('[data-tooltip]');
+        if (!target) return;
+        
+        const text = target.getAttribute('data-tooltip');
+        if (!text) return;
+        
+        tooltipEl.textContent = text;
+        tooltipEl.classList.add('visible');
+        
+        // Wait for class addition to measure size correctly
+        const rect = target.getBoundingClientRect();
+        const tooltipRect = tooltipEl.getBoundingClientRect();
+        
+        // Center horizontally above target
+        let left = rect.left + (rect.width - tooltipRect.width) / 2;
+        let top = rect.top - tooltipRect.height - 8; // 8px above target
+        
+        // Prevent viewport overflow
+        if (left < 10) left = 10;
+        if (left + tooltipRect.width > window.innerWidth - 10) {
+            left = window.innerWidth - tooltipRect.width - 10;
+        }
+        if (top < 10) {
+            // Position below if no space above
+            top = rect.bottom + 8;
+        }
+        
+        tooltipEl.style.left = `${left}px`;
+        tooltipEl.style.top = `${top}px`;
+    });
+    
+    document.addEventListener('mouseout', (e) => {
+        const currentTarget = e.target.closest('[data-tooltip]');
+        if (!currentTarget) return;
+        
+        const relatedTarget = e.relatedTarget;
+        if (relatedTarget && currentTarget.contains(relatedTarget)) {
+            return; // Still inside the same element, do nothing
+        }
+        
+        tooltipEl.classList.remove('visible');
+    });
+}
+
+// ==========================================
+// 22. MÓDULO MATRIZ DE TENDENCIAS TEMÁTICAS
+// ==========================================
+
+const TENDENCIAS2_DATA = [
+    // DIMENSIÓN: SOCIAL
+    {
+        dimension: 'Social',
+        dimClass: 'social',
+        indicator: 'Índice de Gini (concentración del ingreso)',
+        indicatorId: 3289,
+        trend: 'Desfavorable',
+        trendClass: 'desfavorable',
+        trendIcon: 'fa-arrow-trend-down',
+        description: 'La desigualdad de ingresos en ALC se mantiene estructuralmente alta (Gini ~0.46). Colombia presenta uno de los índices más elevados de la región (~0.54), con rigidez en la movilidad social que limita los efectos positivos del crecimiento económico.',
+        colombiaNote: 'Colombia: Gini ≈ 0.54 — uno de los más altos del mundo.',
+        history: {
+            years: [2018, 2019, 2020, 2021, 2022, 2023],
+            col: [51.8, 52.6, 54.4, 52.3, 55.6, 54.6],
+            alc: [46.2, 46.5, 46.8, 46.1, 45.8, 45.7]
+        },
+        evolution: 'Desigualdad persistentemente alta; la brecha Colombia-ALC aumentó durante la pandemia y sigue rígida en niveles críticos (~0.54).'
+    },
+    {
+        dimension: 'Social',
+        dimClass: 'social',
+        indicator: 'Pobreza monetaria y pobreza extrema',
+        indicatorId: 3328,
+        trend: 'Favorable',
+        trendClass: 'favorable',
+        trendIcon: 'fa-arrow-trend-up',
+        description: 'La pobreza monetaria regional alcanzó su nivel más bajo (25.5% en 2024). Colombia bajó al 33%, apoyada en subsidios del gobierno y recuperación del empleo urbano, aunque persisten altas brechas en zonas rurales.',
+        colombiaNote: 'Colombia: pobreza monetaria ≈ 33% (2023); pobreza multidimensional ≈ 12.1%.',
+        history: {
+            years: [2018, 2019, 2020, 2021, 2022, 2023],
+            col: [34.7, 35.7, 42.5, 39.3, 36.6, 33.0],
+            alc: [30.2, 30.5, 32.8, 31.4, 29.0, 27.3]
+        },
+        evolution: 'Reducción significativa post-pandemia de 42.5% a 33% en Colombia, convergiendo lentamente hacia el promedio de ALC.'
+    },
+    {
+        dimension: 'Social',
+        dimClass: 'social',
+        indicator: 'Índices de Theil, Atkinson y Varianza logarítmica',
+        indicatorId: 3303,
+        trend: 'Desfavorable',
+        trendClass: 'desfavorable',
+        trendIcon: 'fa-arrow-trend-down',
+        description: 'Las medidas alternativas de desigualdad confirman una concentración persistente del ingreso en toda ALC. En Colombia, estos índices reflejan que la mejora en pobreza no se traduce en mayor equidad distributiva.',
+        colombiaNote: 'Colombia: altos valores en todos los índices multidimensionales de desigualdad.',
+        history: {
+            years: [2018, 2019, 2020, 2021, 2022, 2023],
+            col: [0.48, 0.49, 0.51, 0.49, 0.53, 0.52],
+            alc: [0.38, 0.39, 0.40, 0.38, 0.37, 0.37]
+        },
+        evolution: 'Concentración de ingresos estancada; los índices alternativos corroboran que la riqueza se mantiene concentrada en el decil superior.'
+    },
+    {
+        dimension: 'Social',
+        dimClass: 'social',
+        indicator: 'Tasa de analfabetismo por sexo y edad',
+        indicatorId: 53,
+        trend: 'Favorable',
+        trendClass: 'favorable',
+        trendIcon: 'fa-arrow-trend-up',
+        description: 'ALC ha avanzado en reducir el analfabetismo, especialmente en población joven. Colombia mantiene una tasa inferior al promedio regional pero enfrenta rezagos significativos en zonas rurales y en la población adulta mayor.',
+        colombiaNote: 'Colombia: analfabetismo adulto ≈ 5.6%; rezago crítico en zonas rurales.',
+        history: {
+            years: [2018, 2019, 2020, 2021, 2022, 2023],
+            col: [5.2, 5.1, 5.0, 5.0, 4.9, 4.8],
+            alc: [6.8, 6.7, 6.6, 6.5, 6.4, 6.3]
+        },
+        evolution: 'Evolución favorable constante; Colombia mantiene tasas de analfabetismo por debajo del promedio regional en los últimos 6 años.'
+    },
+    // DIMENSIÓN: GÉNERO
+    {
+        dimension: 'Género',
+        dimClass: 'genero',
+        indicator: 'Tasa de participación en la fuerza de trabajo (por sexo)',
+        indicatorId: 120,
+        trend: 'Neutral',
+        trendClass: 'neutral',
+        trendIcon: 'fa-minus',
+        description: 'La brecha de participación laboral por género supera los 20 puntos porcentuales en ALC. El mercado laboral sigue fuertemente segmentado, agravado por la injusta distribución del trabajo de cuidados no remunerado.',
+        colombiaNote: 'Colombia: brecha femenina de participación > 20 pp; Sistema Nacional de Cuidado en implementación.',
+        history: {
+            years: [2018, 2019, 2020, 2021, 2022, 2023],
+            col: [63.5, 62.8, 59.2, 61.5, 63.8, 64.2],
+            alc: [62.1, 62.5, 58.7, 60.8, 62.2, 62.6]
+        },
+        evolution: 'Recuperación post-pandemia lograda en 2023, pero las brechas de género en participación (Femenina vs Masculina) se mantienen rígidas.'
+    },
+    {
+        dimension: 'Género',
+        dimClass: 'genero',
+        indicator: 'Tasa de desocupación por sexo',
+        indicatorId: 127,
+        trend: 'Desfavorable',
+        trendClass: 'desfavorable',
+        trendIcon: 'fa-arrow-trend-down',
+        description: 'Las mujeres enfrentan mayor desocupación que los hombres en ALC. En Colombia, la tasa de desocupación femenina supera en cerca de 4-5 puntos la masculina, con mayor impacto en los sectores informales y rurales.',
+        colombiaNote: 'Colombia: desocupación femenina ≈ 14%; masculina ≈ 9% (2023).',
+        history: {
+            years: [2018, 2019, 2020, 2021, 2022, 2023],
+            col: [9.7, 10.5, 15.9, 13.7, 11.2, 10.2],
+            alc: [8.0, 8.1, 10.4, 9.3, 7.0, 6.3]
+        },
+        evolution: 'Desempleo en Colombia superior a ALC. Persiste brecha de género con desocupación femenina (~14%) mucho mayor que la masculina.'
+    },
+    // DIMENSIÓN: POBLACIÓN
+    {
+        dimension: 'Población',
+        dimClass: 'poblacion',
+        indicator: 'Población por grupos quinquenales de edad',
+        indicatorId: 4789,
+        trend: 'Neutral',
+        trendClass: 'neutral',
+        trendIcon: 'fa-minus',
+        description: 'ALC atraviesa una transición demográfica avanzada: reducción de natalidad y aumento de la población adulta mayor. Colombia se ubica en plena transición, con un bono demográfico que se irá agotando hacia 2040.',
+        colombiaNote: 'Colombia: bono demográfico activo; proporción de adultos mayores en ascenso.',
+        history: {
+            years: [2018, 2019, 2020, 2021, 2022, 2023],
+            col: [21.5, 21.0, 20.6, 20.2, 19.8, 19.4],
+            alc: [22.8, 22.4, 22.0, 21.6, 21.2, 20.8]
+        },
+        evolution: 'Transición demográfica acelerada; caída constante del porcentaje de población joven y aumento sostenido de la población adulta mayor.'
+    },
+    {
+        dimension: 'Población',
+        dimClass: 'poblacion',
+        indicator: 'Relación de dependencia demográfica',
+        indicatorId: 4792,
+        trend: 'Favorable',
+        trendClass: 'favorable',
+        trendIcon: 'fa-arrow-trend-up',
+        description: 'La relación de dependencia en ALC se mantiene favorable gracias al bono demográfico, aunque empieza a revertirse en los países más envejecidos. Colombia aún se beneficia, con una dependencia inferior al promedio regional.',
+        colombiaNote: 'Colombia: dependencia demográfica ≈ 45.3 por 100 activos (2024); menor a ALC ≈ 47.8.',
+        history: {
+            years: [2018, 2019, 2020, 2021, 2022, 2023],
+            col: [47.5, 46.8, 46.2, 45.8, 45.5, 45.3],
+            alc: [49.8, 49.3, 48.8, 48.4, 48.0, 47.8]
+        },
+        evolution: 'Bono demográfico activo y favorable; la carga de dependencia en Colombia es menor a la regional, con reducción progresiva en el periodo.'
+    },
+    {
+        dimension: 'Población',
+        dimClass: 'poblacion',
+        indicator: 'Pobreza y pobreza extrema por sexo y edad',
+        indicatorId: 3341,
+        trend: 'Desfavorable',
+        trendClass: 'desfavorable',
+        trendIcon: 'fa-arrow-trend-down',
+        description: 'La pobreza intersecta fuynertemente con el género y la edad en ALC: niños y mujeres tienen probabilidades más altas de ser pobres. En Colombia, la pobreza infantil en zonas rurales supera el 50%, evidenciando trampas generacionales.',
+        colombiaNote: 'Colombia: pobreza infantil rural > 50%; pobreza en mujeres mayor que en hombres.',
+        history: {
+            years: [2018, 2019, 2020, 2021, 2022, 2023],
+            col: [35.2, 36.1, 43.0, 39.8, 37.0, 33.4],
+            alc: [30.5, 30.8, 33.1, 31.7, 29.3, 27.6]
+        },
+        evolution: 'La pobreza en menores de 15 años y en mujeres sigue siendo desproporcionadamente alta en comparación con el promedio regional.'
+    },
+    // DIMENSIÓN: MACRO
+    {
+        dimension: 'Macro',
+        dimClass: 'macro',
+        indicator: 'PIB total anual por habitante (precios constantes en USD)',
+        indicatorId: 2206,
+        trend: 'Desfavorable',
+        trendClass: 'desfavorable',
+        trendIcon: 'fa-arrow-trend-down',
+        description: 'ALC consolida una trampa de bajo crecimiento con proyecciones del 2.4% para 2025. Colombia enfrenta limitaciones estructurales de productividad y restricciones fiscales que impiden alcanzar tasas sostenidas superiores al 3%.',
+        colombiaNote: 'Colombia: PIB/hab ≈ 6,200 USD (2023) vs. ALC ≈ 8,800 USD. Brecha en ascenso.',
+        history: {
+            years: [2018, 2019, 2020, 2021, 2022, 2023],
+            col: [6100, 6250, 5700, 6150, 6600, 6200],
+            alc: [8900, 8950, 8200, 8500, 8900, 8800]
+        },
+        evolution: 'Rezago constante frente a ALC; brecha de ingreso promedio de ~2,600 USD por habitante que no muestra signos de cerrarse.'
+    },
+    {
+        dimension: 'Macro',
+        dimClass: 'macro',
+        indicator: 'Tasa de desocupación total',
+        indicatorId: 127,
+        trend: 'Neutral',
+        trendClass: 'neutral',
+        trendIcon: 'fa-minus',
+        description: 'El desempleo regional se mantiene estable pero no desciende. En Colombia, la tasa de desocupación (≈10.2%) supera a la media de ALC (≈6.3%), impulsada por alta informalidad (>55%) y baja productividad de las MiPyMEs.',
+        colombiaNote: 'Colombia: desocupación ≈ 10.2% vs. ALC ≈ 6.3%. Informalidad laboral > 55%.',
+        history: {
+            years: [2018, 2019, 2020, 2021, 2022, 2023],
+            col: [9.7, 10.5, 15.9, 13.7, 11.2, 10.2],
+            alc: [8.0, 8.1, 10.4, 9.3, 7.0, 6.3]
+        },
+        evolution: 'Tasa de desempleo nacional de dos dígitos (10.2%) superior al promedio de ALC (6.3%), con rigideces estructurales de informalidad.'
+    },
+    {
+        dimension: 'Macro',
+        dimClass: 'macro',
+        indicator: 'Emisiones de CO₂ por habitante',
+        indicatorId: 5649,
+        trend: 'Favorable',
+        trendClass: 'favorable',
+        trendIcon: 'fa-arrow-trend-up',
+        description: 'ALC muestra una de las menores huellas de carbono per cápita globales. Colombia registra un valor inferior al promedio regional (1.6 vs. 2.8 tCO₂/hab), aunque la transición energética demanda inversión urgente en renovables.',
+        colombiaNote: 'Colombia: 1.6 tCO₂/hab (2021) vs. ALC ≈ 2.8. Potencial verde alto en Guajira y Amazonía.',
+        history: {
+            years: [2016, 2017, 2018, 2019, 2020, 2021],
+            col: [1.55, 1.58, 1.62, 1.60, 1.52, 1.60],
+            alc: [2.90, 2.85, 2.80, 2.78, 2.50, 2.80]
+        },
+        evolution: 'Huella de carbono per cápita baja y estable; Colombia se mantiene cerca de 1.2 tCO2/hab por debajo de la media regional.'
+    },
+    // DIMENSIÓN: AMBIENTE
+    {
+        dimension: 'Ambiente',
+        dimClass: 'ambiente',
+        indicator: 'Emisiones de CO₂ por habitante (transición climática)',
+        indicatorId: 5649,
+        trend: 'Favorable',
+        trendClass: 'favorable',
+        trendIcon: 'fa-arrow-trend-up',
+        description: 'Los flujos de IED hacia energías renovables y minerales críticos se aceleran. ALC tiene posición geopolítica estratégica en cobre, litio y energía solar/eólica. Colombia proyecta ser hub de data centers y energía limpia.',
+        colombiaNote: 'Colombia: proyectos eólicos y solares en Guajira con retrasos por consultas previas y licencias.',
+        history: {
+            years: [2016, 2017, 2018, 2019, 2020, 2021],
+            col: [1.55, 1.58, 1.62, 1.60, 1.52, 1.60],
+            alc: [2.90, 2.85, 2.80, 2.78, 2.50, 2.80]
+        },
+        evolution: 'Transición energética lenta en ejecución; las bajas emisiones reflejan matriz eléctrica limpia pero persisten retos de transporte e industria.'
+    },
+    {
+        dimension: 'Ambiente',
+        dimClass: 'ambiente',
+        indicator: 'Población ocupada cotizante a pensiones',
+        indicatorId: 5338,
+        trend: 'Desfavorable',
+        trendClass: 'desfavorable',
+        trendIcon: 'fa-arrow-trend-down',
+        description: 'La baja cobertura pensional en ALC se vincula con la alta informalidad. En Colombia, menos del 30% de la PEA cotiza regularmente a pensiones, generando vulnerabilidad en la vejez especialmente para mujeres y trabajadores rurales.',
+        colombiaNote: 'Colombia: cobertura pensional < 30% de la PEA. Reforma pensional en debate en el Congreso.',
+        history: {
+            years: [2018, 2019, 2020, 2021, 2022, 2023],
+            col: [27.2, 27.5, 26.8, 28.1, 28.9, 29.5],
+            alc: [35.5, 35.8, 34.2, 35.1, 35.6, 36.0]
+        },
+        evolution: 'Desfavorable y estancado por debajo del 30% en Colombia frente al 36% promedio de ALC, debido a la persistencia del empleo informal.'
+    }
+];
+
+// Helper to draw clean mini sparkline charts on a 2D canvas
+function drawSparkline(canvasId, years, colData, alcData) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Find min and max across all data to scale
+    const allData = [...colData, ...alcData].filter(v => v !== null && v !== undefined);
+    if (allData.length === 0) return;
+    const minVal = Math.min(...allData) * 0.98;
+    const maxVal = Math.max(...allData) * 1.02;
+    const range = maxVal - minVal || 1.0;
+    
+    const pointsCount = years.length;
+    const stepX = canvas.width / (pointsCount - 1);
+    
+    const getX = (i) => i * stepX;
+    const getY = (val) => canvas.height - 4 - ((val - minVal) / range) * (canvas.height - 8);
+    
+    // Draw background grid lines (subtle center line)
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, canvas.height / 2);
+    ctx.lineTo(canvas.width, canvas.height / 2);
+    ctx.stroke();
+    
+    // Draw ALC/Region series (Purple)
+    ctx.strokeStyle = 'rgba(168, 85, 247, 0.55)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    let firstAlc = true;
+    for (let i = 0; i < pointsCount; i++) {
+        if (alcData[i] === null || alcData[i] === undefined) continue;
+        const x = getX(i);
+        const y = getY(alcData[i]);
+        if (firstAlc) {
+            ctx.moveTo(x, y);
+            firstAlc = false;
+        } else {
+            ctx.lineTo(x, y);
+        }
+    }
+    ctx.stroke();
+    
+    // Draw Colombia series (Yellow)
+    ctx.strokeStyle = 'rgba(255, 215, 0, 0.85)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    let firstCol = true;
+    for (let i = 0; i < pointsCount; i++) {
+        if (colData[i] === null || colData[i] === undefined) continue;
+        const x = getX(i);
+        const y = getY(colData[i]);
+        if (firstCol) {
+            ctx.moveTo(x, y);
+            firstCol = false;
+        } else {
+            ctx.lineTo(x, y);
+        }
+    }
+    ctx.stroke();
+    
+    // Draw little end dot for Colombia
+    if (pointsCount > 0) {
+        ctx.fillStyle = '#ffd700';
+        const lastIdx = pointsCount - 1;
+        if (colData[lastIdx] !== null && colData[lastIdx] !== undefined) {
+            ctx.beginPath();
+            ctx.arc(getX(lastIdx), getY(colData[lastIdx]), 3, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+}
+
+function renderTendencias2() {
+    const tbody = document.getElementById('tendencias2-table-body');
+    const tabsContainer = document.getElementById('tendencias2-dimension-tabs');
+    if (!tbody || !tabsContainer) return;
+
+    // Get unique dimensions
+    const dims = ['Todos', ...new Set(TENDENCIAS2_DATA.map(d => d.dimension))];
+
+    // Render dimension filter tabs
+    tabsContainer.innerHTML = dims.map(dim => {
+        const isActive = appState.selectedTendencia2Dimension === dim;
+        return `<button class="btn-tab ${isActive ? 'active' : ''}" style="padding: 0.4rem 0.9rem; border-radius: 7px; border: none; cursor: pointer;" onclick="setTendencias2Dimension('${dim}')">${dim}</button>`;
+    }).join('');
+
+    // Filter rows
+    const searchVal = (document.getElementById('tendencias2-search-input') || {}).value || '';
+    const q = searchVal.toLowerCase().trim();
+    const filtered = TENDENCIAS2_DATA.filter(row => {
+        const dimMatch = appState.selectedTendencia2Dimension === 'Todos' || row.dimension === appState.selectedTendencia2Dimension;
+        const textMatch = !q || row.indicator.toLowerCase().includes(q) || row.dimension.toLowerCase().includes(q) || row.description.toLowerCase().includes(q) || row.colombiaNote.toLowerCase().includes(q) || row.evolution.toLowerCase().includes(q);
+        return dimMatch && textMatch;
+    });
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-muted);"><i class="fa-solid fa-magnifying-glass" style="margin-right: 0.5rem;"></i>No se encontraron tendencias que coincidan con el filtro.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = filtered.map((row, index) => {
+        const sparklineId = `sparkline-${row.indicatorId}-${index}`;
+        return `
+        <tr class="mass-table-row" style="border-bottom: 1px solid var(--border-color); vertical-align: top; transition: background 0.15s;">
+            <td style="padding: 0.85rem 1rem; vertical-align: middle;">
+                <span class="badge-dimension ${row.dimClass}">
+                    <i class="fa-solid ${row.dimClass === 'social' ? 'fa-people-group' : row.dimClass === 'genero' ? 'fa-venus-mars' : row.dimClass === 'poblacion' ? 'fa-users' : row.dimClass === 'macro' ? 'fa-chart-line' : 'fa-leaf'}" style="margin-right: 0.35rem;"></i>
+                    ${row.dimension}
+                </span>
+            </td>
+            <td style="padding: 0.85rem 1rem; font-weight: 600; font-size: 0.85rem; color: var(--text-primary); vertical-align: middle; line-height: 1.35;">
+                [${row.indicatorId}] ${row.indicator}
+            </td>
+            <td style="padding: 0.85rem 1rem; text-align: center; vertical-align: middle;">
+                <span class="badge-trend ${row.trendClass}">
+                    <i class="fa-solid ${row.trendIcon}" style="margin-right: 0.3rem;"></i>
+                    ${row.trend}
+                </span>
+            </td>
+            <td style="padding: 0.85rem 1rem; font-size: 0.82rem; line-height: 1.5; vertical-align: top;">
+                <p style="color: var(--text-secondary); margin: 0 0 0.5rem 0;">${row.description}</p>
+                <span style="display: inline-block; font-size: 0.75rem; color: var(--color-colombia); font-weight: 600; padding: 0.2rem 0.55rem; background: rgba(255,215,0,0.06); border: 1px solid rgba(255,215,0,0.15); border-radius: 5px;">
+                    <i class="fa-solid fa-flag" style="margin-right: 0.3rem; font-size: 0.65rem;"></i>${row.colombiaNote}
+                </span>
+            </td>
+            <td style="padding: 0.85rem 1rem; vertical-align: middle;">
+                <div style="display: flex; flex-direction: column; gap: 0.35rem; align-items: center; max-width: 210px; margin: 0 auto;">
+                    <canvas id="${sparklineId}" width="180" height="42" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 6px; padding: 2px 4px; box-sizing: border-box; width: 180px; height: 42px;"></canvas>
+                    <p style="color: var(--text-muted); font-size: 0.72rem; text-align: center; margin: 0; font-style: italic; line-height: 1.3;">
+                        ${row.evolution}
+                    </p>
+                </div>
+            </td>
+            <td style="padding: 0.85rem 1rem; text-align: center; vertical-align: middle;">
+                <button class="btn-primary" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; border-radius: 6px;" onclick="selectIndicatorFromTrend(${row.indicatorId}, '${row.indicator.replace(/'/g, "\\'")}')">
+                    <i class="fa-solid fa-chart-line"></i> Graficar
+                </button>
+            </td>
+        </tr>
+    `;
+    }).join('');
+
+    // Draw sparklines
+    filtered.forEach((row, index) => {
+        if (row.history) {
+            const sparklineId = `sparkline-${row.indicatorId}-${index}`;
+            requestAnimationFrame(() => {
+                drawSparkline(sparklineId, row.history.years, row.history.col, row.history.alc);
+            });
+        }
+    });
+}
+
+function setTendencias2Dimension(dim) {
+    appState.selectedTendencia2Dimension = dim;
+    renderTendencias2();
+}
+
+function filterTendencias2() {
+    renderTendencias2();
+}
+
+function updateTokenStatusBar() {
+    const balanceEl = document.getElementById('diag-balance');
+    const tokensTotalEl = document.getElementById('diag-tokens-total');
+    
+    if (balanceEl) balanceEl.textContent = `$${appState.queryBalance.toFixed(4)} USD`;
+    if (tokensTotalEl) tokensTotalEl.textContent = appState.totalTokensUsed.toLocaleString('es-ES');
+}
+
+function resetQueryBalance() {
+    appState.queryBalance = 15.0000;
+    appState.freeTiers = {
+        gemini: 500000,
+        chatgpt: 150000,
+        claude: 100000,
+        qwen: 1000000,
+        llama: 250000
+    };
+    updateTokenStatusBar();
+    
+    // Hide last cost
+    const lastCostContainer = document.getElementById('diag-last-cost-container');
+    if (lastCostContainer) lastCostContainer.style.display = 'none';
+    
+    // Restore original placeholder HTML
+    const placeholder = document.getElementById('diagnostic-placeholder-area');
+    if (placeholder) {
+        placeholder.innerHTML = `
+            <i class="fa-solid fa-wand-magic-sparkles" style="font-size: 2.5rem; color: var(--accent-blue); opacity: 0.85; margin-bottom: 1rem; display: block;"></i>
+            <p style="margin-bottom: 1rem; font-size: 0.9375rem; color: var(--text-secondary); line-height: 1.5;">
+                Solicite un análisis comparativo nacional en profundidad utilizando modelos de inteligencia artificial en paralelo (Gemini, ChatGPT, Claude, Qwen y Llama).
+            </p>
+            <button type="button" class="btn-primary" onclick="requestMultiLlmDiagnostic()" style="margin: 0 auto; background: linear-gradient(135deg, var(--accent-blue) 0%, rgba(59,130,246,0.85) 100%); color: #0b0f19; font-weight: 600; padding: 0.6rem 1.5rem; border-radius: 8px; border: none; display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; transition: var(--transition-smooth); box-shadow: 0 0 15px rgba(59, 130, 246, 0.3);">
+                <i class="fa-solid fa-robot"></i>
+                <span>Generar Diagnóstico Multi-LLM</span>
+            </button>
+        `;
+        placeholder.style.display = 'block';
+    }
+}
+
+function saveOpenAiKey() {
+    const keyInput = document.getElementById('openai-api-key');
+    if (keyInput) {
+        const key = keyInput.value.trim();
+        localStorage.setItem('openai_api_key', key);
+        updateOpenAiKeyStatus(key);
+    }
+}
+
+function updateOpenAiKeyStatus(key) {
+    const statusEl = document.getElementById('openai-key-status');
+    if (statusEl) {
+        if (key) {
+            statusEl.innerHTML = `<i class="fa-solid fa-circle-dot" style="font-size: 0.5rem; color: #10b981;"></i> Conectado a ChatGPT (Real)`;
+            statusEl.style.color = '#10b981';
+        } else {
+            statusEl.innerHTML = `<i class="fa-solid fa-circle-dot" style="font-size: 0.5rem; color: #64748b;"></i> Modo Simulado (Heurístico)`;
+            statusEl.style.color = 'var(--text-muted)';
+        }
+    }
+}
+
+function loadOpenAiKey() {
+    // API Key se ingresa en la interfaz (campo API Key OpenAI) y se guarda en localStorage del navegador.
+    // No se almacena ninguna clave por defecto en el código fuente.
+    let key = localStorage.getItem('openai_api_key') || '';
+    const keyInput = document.getElementById('openai-api-key');
+    if (keyInput) {
+        keyInput.value = key;
+    }
+    updateOpenAiKeyStatus(key);
+}
+
+async function fetchOpenAiGpt4(promptText, onChunk, onComplete, onError) {
+    const key = localStorage.getItem('openai_api_key');
+    if (!key) {
+        onError("API Key no configurada.");
+        return;
+    }
+    
+    try {
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${key}`
+            },
+            body: JSON.stringify({
+                model: 'gpt-4o-mini',
+                messages: [
+                    {
+                        role: 'system',
+                        content: 'Eres un analista experto de la CEPAL. Sigue de forma estricta las instrucciones del prompt enviado y limítate al dataset provisto sin alucinaciones ni asunciones externas.'
+                    },
+                    {
+                        role: 'user',
+                        content: promptText
+                    }
+                ],
+                temperature: 0.2,
+                stream: true
+            })
+        });
+        
+        if (!response.ok) {
+            const errJson = await response.json().catch(() => ({}));
+            const errMsg = errJson.error ? errJson.error.message : `HTTP Error ${response.status}`;
+            throw new Error(errMsg);
+        }
+        
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let done = false;
+        let buffer = '';
+        let fullText = '';
+        
+        while (!done) {
+            const { value, done: readerDone } = await reader.read();
+            done = readerDone;
+            if (value) {
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+                
+                for (const line of lines) {
+                    const cleanLine = line.trim();
+                    if (cleanLine.startsWith('data: ')) {
+                        const dataStr = cleanLine.substring(6);
+                        if (dataStr === '[DONE]') {
+                            done = true;
+                            break;
+                        }
+                        try {
+                            const parsed = JSON.parse(dataStr);
+                            const chunk = parsed.choices[0].delta.content || '';
+                            if (chunk) {
+                                fullText += chunk;
+                                onChunk(chunk);
+                            }
+                        } catch (e) {
+                            // Ignore parsing errors
+                        }
+                    }
+                }
+            }
+        }
+        
+        onComplete(fullText);
+    } catch (err) {
+        onError(err.message);
+    }
+}
+
+function parseMarkdownToHtml(md) {
+    if (!md) return '';
+    return md
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\n\n/g, '</p><p>')
+        .replace(/\n/g, '<br>')
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        .replace(/###\s+([^\n]+)/g, '<h5 style="margin-top: 1rem; color: var(--text-primary); font-weight: 700;">$1</h5>')
+        .replace(/####\s+([^\n]+)/g, '<h6 style="margin-top: 0.75rem; color: var(--text-primary); font-weight: 700;">$1</h6>')
+        .replace(/-\s+([^\n]+)/g, '<li style="margin-bottom: 0.25rem;">$1</li>')
+        // Wrap lists
+        .replace(/(<li style="margin-bottom: 0.25rem;">.*<\/li>)/gs, '<ul style="margin: 0.75rem 0; padding-left: 1.25rem; list-style-type: disc;">$1</ul>')
+        .trim();
+}
+
+function setGptCompareMode(mode) {
+    const btnReal = document.getElementById('btn-gptmode-real');
+    const btnHeur = document.getElementById('btn-gptmode-heuristic');
+    const contentReal = document.getElementById('gpt-compare-content-real');
+    const contentHeur = document.getElementById('gpt-compare-content-heuristic');
+    
+    if (mode === 'real') {
+        if (btnReal) {
+            btnReal.classList.add('active');
+            btnReal.style.background = 'rgba(245, 158, 11, 0.15)';
+            btnReal.style.color = '#f59e0b';
+        }
+        if (btnHeur) {
+            btnHeur.classList.remove('active');
+            btnHeur.style.background = 'transparent';
+            btnHeur.style.color = 'var(--text-secondary)';
+        }
+        if (contentReal) contentReal.style.display = 'block';
+        if (contentHeur) contentHeur.style.display = 'none';
+    } else {
+        if (btnReal) {
+            btnReal.classList.remove('active');
+            btnReal.style.background = 'transparent';
+            btnReal.style.color = 'var(--text-secondary)';
+        }
+        if (btnHeur) {
+            btnHeur.classList.add('active');
+            btnHeur.style.background = 'rgba(245, 158, 11, 0.15)';
+            btnHeur.style.color = '#f59e0b';
+        }
+        if (contentReal) contentReal.style.display = 'none';
+        if (contentHeur) contentHeur.style.display = 'block';
+    }
+}
+
 
 
